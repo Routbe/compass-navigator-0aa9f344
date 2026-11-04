@@ -1,4 +1,4 @@
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { QRCodeCanvas } from "qrcode.react";
 import { toast } from "sonner";
 import { useServerFn } from "@tanstack/react-start";
@@ -54,7 +54,6 @@ import { DASHBOARD_WIDGETS, OPTIONAL_DASHBOARD_WIDGETS, normalizeDashboardLayout
 import { DashboardMusic, DashboardWeather, DashboardVisitors, UpcomingDashboardWidget } from "./ExternalDashboardWidgets";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { getCommandCenterPrefs, saveCommandCenterPrefs } from "@/lib/dashboard-widgets.functions";
-import { useRef } from "react";
 import { i18n as trI18n } from "@/lib/i18n";
 import { ShareWidget, CardWidget } from "./ShareCardWidgets";
 import { useMyHandle } from "@/hooks/useMyHandle";
@@ -702,7 +701,6 @@ export function CommandCenter() {
     weather: () => setConfiguring("weather"),
     spotify: () => { window.location.href = "/studio"; },
     hub: () => { window.location.href = "/studio"; },
-    presence: () => setIsEditingDashboard(false),
   };
   const slot = (id: WidgetId) => ({ editing: isEditingDashboard, hidden: layout.hidden.includes(id), onToggle: layout.toggle, order: layout.order.indexOf(id), tile: layout.tiles[id], onMoveTo: layout.moveTo, onResize: layout.resize, onConfigure: configurable[id], dragging, onDragState: setDragging });
 
@@ -822,6 +820,7 @@ export function CommandCenter() {
           Lokaal gesynchroniseerd {relative(new Date(state.savedAt).toISOString())}
         </p>
       ) : null}
+      <WeatherLocationDialog open={configuring === "weather"} current={layout.weatherCity} userId={user.id} onClose={() => setConfiguring(null)} />
     </AppLayout>
   );
 }
