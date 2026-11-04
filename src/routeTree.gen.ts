@@ -162,6 +162,7 @@ import { Route as InfoHumanVerificationRouteImport } from './routes/info.human-v
 import { Route as InfoIntegrationsRouteImport } from './routes/info.integrations'
 import { Route as InfoLinksAndAnalyticsRouteImport } from './routes/info.links-and-analytics'
 import { Route as InfoNewsletterRouteImport } from './routes/info.newsletter'
+import { Route as InfoParentalConsentRouteImport } from './routes/info.parental-consent'
 import { Route as InfoPaymentPagesRouteImport } from './routes/info.payment-pages'
 import { Route as InfoProfilesRouteImport } from './routes/info.profiles'
 import { Route as InfoQrStudioRouteImport } from './routes/info.qr-studio'
@@ -1183,6 +1184,11 @@ const InfoLinksAndAnalyticsRoute = InfoLinksAndAnalyticsRouteImport.update({
 const InfoNewsletterRoute = InfoNewsletterRouteImport.update({
   id: '/newsletter',
   path: '/newsletter',
+  getParentRoute: () => InfoRoute,
+} as any)
+const InfoParentalConsentRoute = InfoParentalConsentRouteImport.update({
+  id: '/parental-consent',
+  path: '/parental-consent',
   getParentRoute: () => InfoRoute,
 } as any)
 const InfoPaymentPagesRoute = InfoPaymentPagesRouteImport.update({
@@ -2711,6 +2717,7 @@ export interface FileRoutesByFullPath {
   '/info/integrations': typeof InfoIntegrationsRoute
   '/info/links-and-analytics': typeof InfoLinksAndAnalyticsRoute
   '/info/newsletter': typeof InfoNewsletterRoute
+  '/info/parental-consent': typeof InfoParentalConsentRoute
   '/info/payment-pages': typeof InfoPaymentPagesRoute
   '/info/profiles': typeof InfoProfilesRoute
   '/info/qr-studio': typeof InfoQrStudioRoute
@@ -3104,6 +3111,7 @@ export interface FileRoutesByTo {
   '/info/integrations': typeof InfoIntegrationsRoute
   '/info/links-and-analytics': typeof InfoLinksAndAnalyticsRoute
   '/info/newsletter': typeof InfoNewsletterRoute
+  '/info/parental-consent': typeof InfoParentalConsentRoute
   '/info/payment-pages': typeof InfoPaymentPagesRoute
   '/info/profiles': typeof InfoProfilesRoute
   '/info/qr-studio': typeof InfoQrStudioRoute
@@ -3510,6 +3518,7 @@ export interface FileRoutesById {
   '/info/integrations': typeof InfoIntegrationsRoute
   '/info/links-and-analytics': typeof InfoLinksAndAnalyticsRoute
   '/info/newsletter': typeof InfoNewsletterRoute
+  '/info/parental-consent': typeof InfoParentalConsentRoute
   '/info/payment-pages': typeof InfoPaymentPagesRoute
   '/info/profiles': typeof InfoProfilesRoute
   '/info/qr-studio': typeof InfoQrStudioRoute
@@ -3919,6 +3928,7 @@ export interface FileRouteTypes {
     | '/info/integrations'
     | '/info/links-and-analytics'
     | '/info/newsletter'
+    | '/info/parental-consent'
     | '/info/payment-pages'
     | '/info/profiles'
     | '/info/qr-studio'
@@ -4312,6 +4322,7 @@ export interface FileRouteTypes {
     | '/info/integrations'
     | '/info/links-and-analytics'
     | '/info/newsletter'
+    | '/info/parental-consent'
     | '/info/payment-pages'
     | '/info/profiles'
     | '/info/qr-studio'
@@ -4717,6 +4728,7 @@ export interface FileRouteTypes {
     | '/info/integrations'
     | '/info/links-and-analytics'
     | '/info/newsletter'
+    | '/info/parental-consent'
     | '/info/payment-pages'
     | '/info/profiles'
     | '/info/qr-studio'
@@ -6270,6 +6282,13 @@ declare module '@tanstack/react-router' {
       path: '/newsletter'
       fullPath: '/info/newsletter'
       preLoaderRoute: typeof InfoNewsletterRouteImport
+      parentRoute: typeof InfoRoute
+    }
+    '/info/parental-consent': {
+      id: '/info/parental-consent'
+      path: '/parental-consent'
+      fullPath: '/info/parental-consent'
+      preLoaderRoute: typeof InfoParentalConsentRouteImport
       parentRoute: typeof InfoRoute
     }
     '/info/payment-pages': {
@@ -8413,6 +8432,7 @@ interface InfoRouteChildren {
   InfoIntegrationsRoute: typeof InfoIntegrationsRoute
   InfoLinksAndAnalyticsRoute: typeof InfoLinksAndAnalyticsRoute
   InfoNewsletterRoute: typeof InfoNewsletterRoute
+  InfoParentalConsentRoute: typeof InfoParentalConsentRoute
   InfoPaymentPagesRoute: typeof InfoPaymentPagesRoute
   InfoProfilesRoute: typeof InfoProfilesRoute
   InfoQrStudioRoute: typeof InfoQrStudioRoute
@@ -8440,6 +8460,7 @@ const InfoRouteChildren: InfoRouteChildren = {
   InfoIntegrationsRoute: InfoIntegrationsRoute,
   InfoLinksAndAnalyticsRoute: InfoLinksAndAnalyticsRoute,
   InfoNewsletterRoute: InfoNewsletterRoute,
+  InfoParentalConsentRoute: InfoParentalConsentRoute,
   InfoPaymentPagesRoute: InfoPaymentPagesRoute,
   InfoProfilesRoute: InfoProfilesRoute,
   InfoQrStudioRoute: InfoQrStudioRoute,
