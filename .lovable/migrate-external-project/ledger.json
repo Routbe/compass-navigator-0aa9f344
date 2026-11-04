@@ -30,17 +30,19 @@
     },
     {
       "capability": "records",
-      "source": "no record export attached (record_export.coverage = absent)",
-      "outcome": "pending",
-      "status": "pending",
-      "next_action": "request CSV/JSON exports of application tables from Neon/Supabase"
+      "source": "no record export attached; user chose their own Neon, so the app reads the live database directly",
+      "outcome": "preserve",
+      "status": "verified",
+      "evidence": "DATABASE_URL saved; GET /api/profiles/check-handle?handle=testing1234 returns {\"available\":true} from the live database - no CSV/JSON export needed",
+      "next_action": "none"
     },
     {
       "capability": "auth_identities",
       "source": "better-auth on Neon (neon_auth schema): user, account, session, verification, passkey, twoFactor, invitation, member, organization",
-      "outcome": "migrate",
-      "status": "pending",
-      "next_action": "request user export (emails + original user ids); passwords and sessions do not carry over"
+      "outcome": "preserve",
+      "status": "verified",
+      "evidence": "BETTER_AUTH_SECRET + DATABASE_URL saved; GET /api/public/auth/providers -> {providers:[oidc], readiness.ready:true}; /auth/sign-in renders the real form; /dashboard redirects an anonymous visitor to /auth/sign-in. Existing users and sessions stay in their own Neon - no export, no password reset needed",
+      "next_action": "confirm one real sign-in when the user wants it tested"
     },
     {
       "capability": "authorization",
@@ -68,8 +70,8 @@
       "source": "~120 src/routes/api_*.ts handlers: oauth (token/introspect/revoke/userinfo), webhooks (stripe, telegram, bunq, weather, identity), provider callbacks (bluesky, mastodon, spotify, youtube, snapchat), ingest, og, presence, wallet render, health",
       "outcome": "preserve",
       "status": "partially_verified",
-      "evidence": "paths kept identical; content routes return 200; /about and /explore return 500 until the database backend is connected (docs-routing test)",
-      "next_action": "re-check after backend is connected"
+      "evidence": "paths kept identical; /, /developers, /features, /compare, /guide, /contact, /claim, /self-hosting, /info/profiles, /auth/sign-in return 200; /api/public/health operational; /api/profiles/check-handle and /api/public/auth/providers answer from the live database; /about and /explore still 500 until the user's own Supabase is linked",
+      "next_action": "re-check /about and /explore after External Supabase is linked"
     },
     {
       "capability": "schedules",
@@ -81,9 +83,10 @@
     {
       "capability": "secrets",
       "source": "28 env vars (BETTER_AUTH_SECRET, DATABASE_URL/NEON_API_KEY, SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, ROUT_*, SCALEWAY_*, STEAM_WEB_API_KEY, LASTFM_API_KEY, OMNI_*, BREVO_API_KEY, ...)",
-      "outcome": "pending",
+      "outcome": "partially_saved",
       "status": "pending",
-      "next_action": "add through Lovable secure secret form; .env was NOT copied (checked: no hardcoded keys in source)"
+      "evidence": "saved via secure form: DATABASE_URL, PUBLIC_ORIGIN, BETTER_AUTH_SECRET, BREVO_API_KEY, SCALEWAY_ACCESS_KEY, SCALEWAY_SECRET_KEY. SUPABASE_URL / SUPABASE_PUBLISHABLE_KEY cannot be project secrets (reserved prefix) - user links their own Supabase under project settings -> General -> External Supabase -> Connect",
+      "next_action": "user connects External Supabase; then request provider keys (Stripe, bunq, Bluesky, Mastodon, Spotify, YouTube, Steam, Last.fm, Telegram, Snapchat, weather, OMNI, ROUT OAuth, NEON_API_KEY) as features are tested"
     },
     {
       "capability": "worker_service",
@@ -104,7 +107,7 @@
       "source": "build, tests, representative routes",
       "outcome": "partially_verified",
       "status": "partially_verified",
-      "evidence": "build OK; vitest 354/357 files pass (1979/1982 tests); homepage + 8 routes render in a headless browser",
+      "evidence": "build OK; vitest 354/357 files pass (1979/1982 tests); homepage + 9 routes render in a headless browser; Neon read path, auth provider list, sign-in form and signed-out dashboard redirect verified live",
       "known_failures": [
         "src/test/docs-routing.test.ts /about -> HTTP 500 (missing SUPABASE_URL / SUPABASE_PUBLISHABLE_KEY)",
         "src/test/migration-replay.test.ts -> db/schema.snapshot.json stale vs migrations (pre-existing)",
