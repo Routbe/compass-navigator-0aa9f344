@@ -1,6 +1,6 @@
 // Master Recovery Key: 24-word BIP39 mnemonic + 2-of-3 Shamir shards over GF(256).
 import { entropyToMnemonic, mnemonicToEntropy, validateMnemonic } from "@scure/bip39";
-import { wordlist } from "@scure/bip39/wordlists/english";
+import { wordlist } from "@scure/bip39/wordlists/english.js";
 import { b64u } from "./crypto";
 
 export function newMasterKey(): { key: Uint8Array; mnemonic: string } {
