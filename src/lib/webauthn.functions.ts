@@ -26,7 +26,7 @@ export async function addPasskey(name: string) {
   if (res?.error) {
     const e = res.error as { code?: string; status?: number; message?: string };
     console.error("[passkeys] register failed", e.code, e.status, e.message);
-    return { ok: false as const, reason: passkeyErrorMessage(e.code, e.status, e.message) };
+    return { ok: false as const, code: e.code, reason: passkeyErrorMessage(e.code, e.status, e.message) };
   }
   return { ok: true as const };
 }
