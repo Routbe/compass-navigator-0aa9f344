@@ -22,6 +22,7 @@ import { removeLegacyPassword } from "@/lib/account-security.functions";
 import { getPasswordState, requestSecurityCode, confirmSecurityCode } from "@/lib/account-security.functions";
 import { useServerFn } from "@tanstack/react-start";
 import { ConnectedAccounts } from "@/components/settings/ConnectedAccounts";
+import { LinkedServicesPanel } from "@/components/settings/LinkedServicesPanel";
 import { AvatarUpload } from "@/components/settings/AvatarUpload";
 import { PhoneVerification } from "@/components/settings/PhoneVerification";
 import { IdentityVerification } from "@/components/settings/IdentityVerification";
@@ -473,6 +474,7 @@ export default function AccountSettings() {
           <ConnectedAppsPanel />
 
           <ConnectedAccounts />
+          <LinkedServicesPanel />
 
           <section className="space-y-3 rounded-2xl border border-border bg-card p-4 sm:p-5">
             <h2 className="flex items-center gap-2 text-lg font-medium">

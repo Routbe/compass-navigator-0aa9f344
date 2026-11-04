@@ -52,3 +52,16 @@ export const saveCommandCenterPrefs = createServerFn({ method: "POST" }).middlew
       coalesce(display_prefs -> 'commandCenter', '{}'::jsonb) || ${JSON.stringify(patch)}::jsonb, true) where id = ${context.userId}`;
     return { ok: true as const };
   });
+
+/** Every service linked to the ROUT profile (Studio, Command Center or Hub), for the account overview. Never returns tokens. */
+export const getAllMyLinkedServices = createServerFn({ method: "GET" }).middleware([requireAuth]).handler(async ({ context }) => {
+  const { sql } = await import("@/lib/neon");
+  const [presence, integrations] = await Promise.all([
+    sql`select provider, show_on_profile, created_at from public.user_presence_connections where user_id = ${context.userId}`.catch(() => []),
+    sql`select provider, visible, coalesce(connection_status, 'connected') as status, created_at from public.user_integrations where user_id = ${context.userId}`.catch(() => []),
+  ]);
+  const map = new Map<string, { provider: string; status: string; publicOnProfile: boolean }>();
+  for (const r of integrations as Record<string, unknown>[]) map.set(String(r["provider"]), { provider: String(r["provider"]), status: String(r["status"]), publicOnProfile: Boolean(r["visible"]) });
+  for (const r of presence as Record<string, unknown>[]) map.set(String(r["provider"]), { provider: String(r["provider"]), status: "connected", publicOnProfile: Boolean(r["show_on_profile"]) });
+  return [...map.values()].sort((a, b) => a.provider.localeCompare(b.provider));
+});
