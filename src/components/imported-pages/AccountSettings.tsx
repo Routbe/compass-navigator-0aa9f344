@@ -16,7 +16,9 @@ import {
 import { AppLayout } from "@/components/layout/AppLayout";
 import { PasskeysPanel } from "@/components/settings/PasskeysPanel";
 import { ConnectedAppsPanel } from "@/components/settings/ConnectedAppsPanel";
-import { PasswordPanel } from "@/components/settings/PasswordPanel";
+import { RecoveryCodes } from "@/components/settings/RecoveryCodes";
+import { HardwareKeyPanel } from "@/components/settings/HardwareKeyPanel";
+import { removeLegacyPassword } from "@/lib/account-security.functions";
 import { getPasswordState, requestSecurityCode, confirmSecurityCode } from "@/lib/account-security.functions";
 import { useServerFn } from "@tanstack/react-start";
 import { ConnectedAccounts } from "@/components/settings/ConnectedAccounts";
@@ -114,6 +116,8 @@ export default function AccountSettings() {
   const [mfaPassword, setMfaPassword] = useState("");
   const [mfaUri, setMfaUri] = useState<string | null>(null);
   const [mfaBackup, setMfaBackup] = useState<string[]>([]);
+  const [mfaCodesSaved, setMfaCodesSaved] = useState(false);
+  const dropPassword = useServerFn(removeLegacyPassword);
   const [mfaBusy, setMfaBusy] = useState(false);
 
   const [exporting, setExporting] = useState(false);
@@ -191,6 +195,7 @@ export default function AccountSettings() {
     setMfaCode("");
     setMfaPassword("");
     setMfaBackup([]);
+    setMfaCodesSaved(false);
     setMfaEmailCode("");
     setMfaCodeSentTo(null);
     setMfaDialogOpen(true);
@@ -207,23 +212,20 @@ export default function AccountSettings() {
 
   const start2fa = async () => {
     setMfaBusy(true);
-    if (hasPassword === false) {
-      const ok = await checkSecurityCode({ data: { purpose: "two_factor", code: mfaEmailCode } }).then((r) => r.ok).catch(() => false);
-      if (!ok) {
-        setMfaBusy(false);
-        return toast.error(trI18n.t("ui.2d86b15716"));
-      }
+    // Passwordless: an e-mail code proves the member; a legacy password is erased with it.
+    const ok = hasPassword
+      ? await dropPassword({ data: { code: mfaEmailCode } }).then((r) => r.ok).catch(() => false)
+      : await checkSecurityCode({ data: { purpose: "two_factor", code: mfaEmailCode } }).then((r) => r.ok).catch(() => false);
+    if (!ok) {
+      setMfaBusy(false);
+      return toast.error(trI18n.t("ui.2d86b15716"));
     }
-    const res = await authClient.twoFactor.enable({ password: mfaPassword || undefined } as never);
+    if (hasPassword) setHasPassword(false);
+    const res = await authClient.twoFactor.enable({} as never);
     setMfaBusy(false);
     if (res.error) {
       const e = res.error as { code?: string; status?: number; message?: string };
       console.error("[2fa] enable failed", e.code, e.status, e.message);
-      if (e.code === "INVALID_PASSWORD") {
-        return toast.error(mfaPassword
-          ? "Dit wachtwoord klopt niet."
-          : "Je account heeft een wachtwoord: vul het één keer in om 2FA in te stellen.");
-      }
       if (e.status === 401) return toast.error(trI18n.t("ui.336089932f"));
       return toast.error(`Could not start 2FA setup${e.message ? `: ${e.message}` : "."}`);
     }
@@ -235,6 +237,7 @@ export default function AccountSettings() {
   };
 
   const verify2fa = async () => {
+    if (!mfaCodesSaved) return toast.error("Bewaar eerst je herstelcodes.");
     setMfaBusy(true);
     const res = await authClient.twoFactor.verifyTotp({ code: mfaCode });
     setMfaBusy(false);
@@ -246,20 +249,17 @@ export default function AccountSettings() {
 
   const disable2fa = async () => {
     const state = await fetchPasswordState().catch(() => ({ hasPassword: true }));
-    let password = "";
-    if (state.hasPassword) {
-      const typed = window.prompt("Geef je wachtwoord om 2FA uit te zetten");
-      if (typed === null) return;
-      password = typed;
-    } else {
+    {
       const sent = await askSecurityCode({ data: { purpose: "two_factor" } });
       if (!sent.ok) return toast.error(trI18n.t("ui.b8f81b1cc5"));
       const code = window.prompt(`We stuurden een code naar ${sent.sentTo}. Vul die in om 2FA uit te zetten.`);
       if (!code) return;
-      const ok = await checkSecurityCode({ data: { purpose: "two_factor", code } }).then((r) => r.ok).catch(() => false);
+      const ok = state.hasPassword
+        ? await dropPassword({ data: { code } }).then((r) => r.ok).catch(() => false)
+        : await checkSecurityCode({ data: { purpose: "two_factor", code } }).then((r) => r.ok).catch(() => false);
       if (!ok) return toast.error(trI18n.t("ui.2d86b15716"));
     }
-    const res = await authClient.twoFactor.disable({ password: password || undefined } as never);
+    const res = await authClient.twoFactor.disable({} as never);
     if (res.error) return toast.error(res.error.message ?? "2FA kon niet uitgeschakeld worden.");
     setMfaEnabled(false);
     toast.success(trI18n.t("ui.82418cec7c"));
@@ -469,40 +469,40 @@ export default function AccountSettings() {
             </Button>
           </section>
 
-          <PasswordPanel />
-
           <PasskeysPanel />
           <ConnectedAppsPanel />
 
           <ConnectedAccounts />
 
           <section className="space-y-3 rounded-2xl border border-border bg-card p-4 sm:p-5">
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <h2 className="flex items-center gap-2 text-lg font-medium">
-                <ShieldCheck className="h-4 w-4" /> Twee-staps-verificatie (2FA)
-              </h2>
-              <Badge
-                className={
-                  mfaEnabled
-                    ? "bg-green-500/15 text-green-700 hover:bg-green-500/15"
-                    : "bg-muted text-muted-foreground hover:bg-muted"
-                }
-              >
-                Status: {mfaEnabled ? "Enabled" : "Disabled"}
-              </Badge>
-            </div>
+            <h2 className="flex items-center gap-2 text-lg font-medium">
+              <ShieldCheck className="h-4 w-4" /> Security Hub · tweestapsverificatie
+            </h2>
             <p className="text-sm text-muted-foreground">
-              Add an extra layer of security to your account using an authenticator app (TOTP).
+              ROUT werkt zonder wachtwoord en zonder beveiligingsvragen. Voeg sterke factoren toe; zwakke factoren kunnen die nooit omzeilen.
             </p>
-            {mfaEnabled ? (
-              <Button onClick={disable2fa} variant="outline" className="h-11 w-full sm:w-auto">
-                2FA uitschakelen
-              </Button>
-            ) : (
-              <Button onClick={enable2fa} variant="outline" className="h-11 w-full sm:w-auto">
-                Enable 2FA
-              </Button>
-            )}
+            <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border bg-background p-3">
+              <div className="min-w-0">
+                <p className="text-sm font-medium">Authenticator-app (TOTP)</p>
+                <p className="text-xs text-muted-foreground">QR-code of Base32-sleutel, met 10 eenmalige herstelcodes.</p>
+              </div>
+              <div className="flex items-center gap-2">
+                <Badge variant={mfaEnabled ? "default" : "secondary"}>{mfaEnabled ? "Actief" : "Inactief"}</Badge>
+                {mfaEnabled ? (
+                  <Button size="sm" variant="outline" onClick={disable2fa}>Uitschakelen</Button>
+                ) : (
+                  <Button size="sm" variant="outline" onClick={enable2fa}>Instellen</Button>
+                )}
+              </div>
+            </div>
+            <HardwareKeyPanel />
+            <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-dashed border-border bg-background p-3">
+              <div className="min-w-0">
+                <p className="text-sm font-medium">Sms- en e-mailcodes</p>
+                <p className="text-xs text-muted-foreground">Alleen als terugval. Kwetsbaar voor simkaart-fraude en phishing; ze vervangen nooit je passkey, app of sleutel.</p>
+              </div>
+              <Badge variant="destructive">Lage beveiliging</Badge>
+            </div>
           </section>
 
           <section className="space-y-3 rounded-2xl border border-border bg-card p-4 sm:p-5">
@@ -613,16 +613,10 @@ export default function AccountSettings() {
             <div className="flex flex-col gap-3">
               {hasPassword === null ? (
                 <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
-              ) : hasPassword ? (
-                <>
-                  <p className="text-sm text-muted-foreground">Bevestig met je wachtwoord.</p>
-                  <Input type="password" value={mfaPassword} onChange={(e) => setMfaPassword(e.target.value)}
-                    placeholder="Wachtwoord" autoComplete="current-password" className="h-11 rounded-xl" />
-                </>
               ) : (
                 <>
                   <p className="text-sm text-muted-foreground">
-                    Je hebt geen wachtwoord. Bevestig met een code die we naar je e-mail sturen.
+                    Bevestig met een code die we naar je e-mail sturen.
                   </p>
                   <Button variant="outline" onClick={sendMfaEmailCode} className="h-11">
                     {mfaCodeSentTo ? "Nieuwe code sturen" : "Stuur code naar mijn e-mail"}
@@ -634,7 +628,7 @@ export default function AccountSettings() {
                   )}
                 </>
               )}
-              <Button onClick={start2fa} disabled={mfaBusy || hasPassword === null || (hasPassword ? !mfaPassword : mfaEmailCode.length !== 6)} className="h-11 w-full">
+              <Button onClick={start2fa} disabled={mfaBusy || hasPassword === null || mfaEmailCode.length !== 6} className="h-11 w-full">
                 {mfaBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : "Show QR code"}
               </Button>
             </div>
@@ -646,7 +640,9 @@ export default function AccountSettings() {
               <p className="break-all text-center font-mono text-[11px] text-muted-foreground">
                 {new URL(mfaUri).searchParams.get("secret")}
               </p>
+              {mfaBackup.length > 0 && <RecoveryCodes codes={mfaBackup} onSaved={setMfaCodesSaved} />}
               <Input
+                disabled={!mfaCodesSaved}
                 value={mfaCode}
                 onChange={(e) => setMfaCode(e.target.value.replace(/\D/g, ""))}
                 inputMode="numeric"
@@ -655,17 +651,9 @@ export default function AccountSettings() {
                 maxLength={6}
                 className="h-11 rounded-xl text-center tracking-widest"
               />
-              <Button onClick={verify2fa} disabled={mfaBusy || mfaCode.length !== 6} className="h-11 w-full">
+              <Button onClick={verify2fa} disabled={mfaBusy || !mfaCodesSaved || mfaCode.length !== 6} className="h-11 w-full">
                 Verify &amp; enable
               </Button>
-              {mfaBackup.length > 0 && (
-                <div className="w-full rounded-xl border border-border p-3">
-                  <p className="mb-2 text-xs font-medium">Backup codes — store them somewhere safe:</p>
-                  <div className="grid grid-cols-2 gap-1 font-mono text-xs">
-                    {mfaBackup.map((c) => <span key={c}>{c}</span>)}
-                  </div>
-                </div>
-              )}
             </div>
           )}
         </DialogContent>

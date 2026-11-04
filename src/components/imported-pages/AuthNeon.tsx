@@ -380,15 +380,13 @@ export default function AuthNeon({ initialMode = "magic" }: { initialMode?: Mode
     if (unavailable) { toast.error(AUTH_UNAVAILABLE_TEXT[locale]); return; }
     if (adminPortal) return;
     if (!emailAccepted()) return;
-    if (password.length < MIN_PASSWORD_LENGTH) {
-      toast.error(t("auth.password.minimum", { count: MIN_PASSWORD_LENGTH }));
-      return;
-    }
     setLoading(true);
     const address = email.trim().toLowerCase();
+    // Passwordless: a throwaway random value satisfies the sign-up API and is erased server-side.
+    const throwaway = Array.from(crypto.getRandomValues(new Uint8Array(32)), (b) => b.toString(16).padStart(2, "0")).join("");
     try {
       const result = await withAltcha(address, (proof) =>
-        authClient.signUp.email({ email: address, password, name: address.split("@")[0] ?? address, callbackURL, fetchOptions: { headers: { "x-altcha": proof, [SIGNUP_CONSENT_HEADER]: SIGNUP_CONSENT_VERSION, [SIGNUP_DOB_HEADER]: dob, ...(minor ? { [SIGNUP_PARENT_EMAIL_HEADER]: parentEmail.trim().toLowerCase() } : {}) } } }),
+        authClient.signUp.email({ email: address, password: throwaway, name: address.split("@")[0] ?? address, callbackURL, fetchOptions: { headers: { "x-altcha": proof, [SIGNUP_CONSENT_HEADER]: SIGNUP_CONSENT_VERSION, [SIGNUP_DOB_HEADER]: dob, ...(minor ? { [SIGNUP_PARENT_EMAIL_HEADER]: parentEmail.trim().toLowerCase() } : {}) } } }),
       );
       const error = (result as { error?: { message?: string } } | undefined)?.error;
       if (error) {
@@ -588,10 +586,11 @@ export default function AuthNeon({ initialMode = "magic" }: { initialMode?: Mode
               </p>
               <button
                 type="button"
-                onClick={() => setMode("password")}
+                onClick={() => setMode("signup")}
+                hidden={adminPortal}
                 className="inline-flex items-center gap-1.5 text-xs text-muted-foreground underline underline-offset-4 hover:text-foreground"
               >
-                <KeyRound className="h-3.5 w-3.5" aria-hidden /> {t("auth.ui.havePassword")}
+                <KeyRound className="h-3.5 w-3.5" aria-hidden /> {t("auth.ui.signup.cta")}
               </button>
             </form>
           ) : mode === "password" ? (
@@ -625,12 +624,7 @@ export default function AuthNeon({ initialMode = "magic" }: { initialMode?: Mode
           ) : (
             <form onSubmit={signUp} className="space-y-3.5">
               {emailField}
-              <PasswordField
-                value={password}
-                onChange={setPassword}
-                required
-                minLength={MIN_PASSWORD_LENGTH}
-              />
+              <p className="text-[11px] leading-relaxed text-muted-foreground">Geen wachtwoord nodig: na het aanmaken voeg je een passkey toe, of log je in met een e-maillink.</p>
               <div className="space-y-1.5">
                 <label htmlFor="auth-signup-dob" className="text-sm font-medium">Geboortedatum</label>
                 <input

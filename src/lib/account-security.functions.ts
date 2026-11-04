@@ -38,6 +38,25 @@ export const confirmSecurityCode = createServerFn({ method: "POST" })
   });
 
 /**
+ * ROUT is passwordless (passkeys, magic link, social). An e-mail code proves the member,
+ * after which any legacy password hash is erased so it can never be used or required again.
+ */
+export const removeLegacyPassword = createServerFn({ method: "POST" })
+  .middleware([requireAuth])
+  .inputValidator((input: { code: string }) => ({ code: String(input?.code ?? "").replace(/\D/g, "").slice(0, 6) }))
+  .handler(async ({ data, context }) => {
+    const { consumeSecurityCode } = await import("./security-code.server");
+    if (!(await consumeSecurityCode(context.userId, "two_factor", data.code))) return { ok: false as const };
+    const { sql } = await import("@/lib/neon");
+    await sql`update neon_auth.account a set password = null, "updatedAt" = now()
+      from public.users u
+      where a."providerId" = 'credential'
+        and a."userId"::text = coalesce(u.auth_user_id::text, u.user_metadata->>'neon_auth_id')
+        and u.id = ${context.userId}`;
+    return { ok: true as const };
+  });
+
+/**
  * Set or change the password. With a password: current password OR e-mail code
  * (forgot it). Without one: e-mail code only.
  */
