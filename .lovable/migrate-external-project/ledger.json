@@ -1,0 +1,106 @@
+{
+  "source": {
+    "kind": "github",
+    "url": "https://github.com/Routbe/compass-navigator-615b6805.git",
+    "checkout": "/tmp/src-repo",
+    "commit": "9631de0",
+    "stack": "TanStack Start v1 + React 19 + Vite 8 + Tailwind v4 + better-auth + Drizzle/Kysely on Neon Postgres",
+    "size": "2725 files, 42 MB (excl. .git, .env)",
+    "routes": 409,
+    "source_files": 2356,
+    "schema_tables": 202
+  },
+  "capabilities": [
+    {
+      "capability": "application_code",
+      "source": "github: src/, public/, vite.config.ts, tsconfig.json, vitest.config.ts, eslint.config.js, components.json, bun.lock, bunfig.toml, scripts/",
+      "outcome": "migrate",
+      "status": "in_progress",
+      "next_action": "copy tree 1:1 into project, then install dependencies and build"
+    },
+    {
+      "capability": "schema",
+      "source": "db/0000_baseline.sql .. db/0202*.sql (201 migrations, 202 tables) + drizzle/schema.ts",
+      "outcome": "migrate",
+      "status": "pending",
+      "next_action": "needs a compatible Postgres; migrations are NOT applied automatically (source AGENTS.md forbids it)"
+    },
+    {
+      "capability": "records",
+      "source": "no record export attached (record_export.coverage = absent)",
+      "outcome": "pending",
+      "status": "pending",
+      "next_action": "request CSV/JSON exports of application tables after preview"
+    },
+    {
+      "capability": "auth_identities",
+      "source": "better-auth tables: user, account, session, verification, passkey, twoFactor, invitation, member, organization",
+      "outcome": "migrate",
+      "status": "pending",
+      "next_action": "request user export (emails + original user ids); no passwords or sessions carry over"
+    },
+    {
+      "capability": "authorization",
+      "source": "admin_permissions, admin_audit_log, organization/member roles, approved_handles, verifications",
+      "outcome": "migrate",
+      "status": "pending",
+      "next_action": "verify roles after identities are imported"
+    },
+    {
+      "capability": "uploaded_file_bytes",
+      "source": "Scaleway S3 buckets (SCALEWAY_DEFAULT_BUCKET, SCALEWAY_CLIENT_BUCKET, S3_* env)",
+      "outcome": "preserve",
+      "status": "pending",
+      "next_action": "request Scaleway keys through the secure secret form"
+    },
+    {
+      "capability": "external_providers",
+      "source": "Stripe, bunq, Bluesky, Mastodon, Spotify, YouTube, Steam, Last.fm, Telegram, Snapchat, weather, OMNI realtime, NEON",
+      "outcome": "preserve",
+      "status": "pending",
+      "next_action": "request provider credentials when verification is ready"
+    },
+    {
+      "capability": "public_endpoints",
+      "source": "~120 src/routes/api_*.ts handlers: oauth, webhooks (stripe, telegram, bunq, weather, identity), callbacks, ingest, og, presence, wallet render",
+      "outcome": "preserve",
+      "status": "pending",
+      "next_action": "keep paths identical; confirm external callers point here after cutover"
+    },
+    {
+      "capability": "schedules",
+      "source": "src/routes/api_.public.cron.*.ts (13 cron targets: audit-checkpoint, availability, check-dns, cleanup-assets, deliver-webhooks, purge-*, scan-transfers, secureshield-billing, sunset-scrubber, sync-followers, sync-socials)",
+      "outcome": "preserve",
+      "status": "pending",
+      "next_action": "needs an external scheduler pointed at these URLs"
+    },
+    {
+      "capability": "secrets",
+      "source": "28 env vars (BETTER_AUTH_SECRET, NEON_API_KEY, ROUT_*, SCALEWAY_*, STEAM_WEB_API_KEY, LASTFM_API_KEY, OMNI_*, ...)",
+      "outcome": "pending",
+      "status": "pending",
+      "next_action": "add through Lovable secure secret form; .env was NOT copied"
+    },
+    {
+      "capability": "worker_service",
+      "source": "worker/ (own Bun app: playwright-core, sharp, postgres, ipaddr.js)",
+      "outcome": "migrate",
+      "status": "pending",
+      "next_action": "code copied; not installed or run here - needs its own host"
+    },
+    {
+      "capability": "cutover",
+      "source": "published site + external callers (webhooks, cron, OAuth redirect URIs)",
+      "outcome": "pending",
+      "status": "pending",
+      "next_action": "decide after preview whether this project replaces the original deployment"
+    },
+    {
+      "capability": "verification",
+      "source": "build, typecheck, tests, representative routes and one create/read/update/delete flow",
+      "outcome": "pending",
+      "status": "pending",
+      "next_action": "run after copy and install"
+    }
+  ]
+}
