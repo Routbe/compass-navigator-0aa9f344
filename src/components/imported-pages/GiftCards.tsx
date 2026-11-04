@@ -51,8 +51,7 @@ export default function GiftCards() {
   }, []);
 
   const effectiveAmount = useMemo(() => {
-    const custom = Number(customAmount.replace(",", ".")) * 100;
-    return clampGiftAmount(customAmount ? custom : amount);
+    return clampGiftAmount(customAmount ? amount : amount);
   }, [amount, customAmount]);
 
   async function submit() {
@@ -128,17 +127,7 @@ export default function GiftCards() {
                     {euro(cents)}
                   </Button>
                 ))}
-                <Input
-                  className="w-36"
-                  inputMode="decimal"
-                  placeholder="Ander bedrag"
-                  value={customAmount}
-                  onChange={(e) => setCustomAmount(e.target.value)}
-                />
               </div>
-              <p className="text-xs text-muted-foreground">
-                Tussen {euro(GIFT_MIN_CENTS)} en {euro(GIFT_MAX_CENTS)}.
-              </p>
             </section>
 
             <section className="space-y-3">

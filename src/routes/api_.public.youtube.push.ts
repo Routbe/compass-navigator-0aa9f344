@@ -13,8 +13,8 @@ export const Route = createFileRoute("/api_/public/youtube/push")({
           return new Response("Bad request", { status: 400 });
         }
         const y = await import("@/lib/youtube.server");
-        if (mode === "subscribe" && !(await y.isKnownYouTubeTopic(topic).catch(() => false))) {
-          return new Response("Unknown topic", { status: 404 });
+        if (!(await y.isKnownYouTubeTopic(topic, q.get("t") ?? "").catch(() => false))) {
+          return new Response("Not found", { status: 404 });
         }
         return new Response(challenge, { status: 200, headers: { "content-type": "text/plain" } });
       },

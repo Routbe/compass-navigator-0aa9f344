@@ -1,10 +1,11 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { optionalAuth, requireAuth } from "@/lib/auth/middleware";
-import { GIFT_MAX_CENTS, GIFT_MIN_CENTS } from "./gift-cards";
+import { GIFT_PRESETS } from "./gift-cards";
 
 const purchaseSchema = z.object({
-  amountCents: z.number().int().min(GIFT_MIN_CENTS).max(GIFT_MAX_CENTS),
+  // Only fixed denominations: the buyer must never choose the charged amount.
+  amountCents: z.number().int().refine((v) => (GIFT_PRESETS as readonly number[]).includes(v), "invalid_amount"),
   purchaserEmail: z.string().email(),
   purchaserName: z.string().trim().max(80).optional().nullable(),
   recipientEmail: z.string().email().optional().nullable(),
