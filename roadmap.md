@@ -34,4 +34,4 @@
 - [x] Weather: location saved once on profile, change via pencil
 - [x] Spotify widget: album art, progress, clear status
 - [x] Account settings: "Gekoppelde diensten" overview
-- [ ] Google Wallet premium tile/icon check — waiting on GOOGLE_SERVICE_ACCOUNT_EMAIL, GOOGLE_PRIVATE_KEY, GOOGLE_WALLET_ISSUER_ID, GOOGLE_WALLET_CLASS_ID
+- [ ] Google Wallet: keys saved; check a real saved pass on a phone
