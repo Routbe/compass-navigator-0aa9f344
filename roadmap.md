@@ -24,3 +24,5 @@
 - [ ] Keys: SMS gateway, Didit (DIDIT_API_KEY, DIDIT_WORKFLOW_ID, DIDIT_WEBHOOK_SECRET, IDENTITY_HASH_PEPPER), Google Wallet — user to supply.
 - [ ] Physical mobile tests (Snapchat share widget, cache invalidation) — user on device.
 - [ ] E2EE: Neon branch `feat-e2e-encryption` connection string — user.
+- [x] Security Hub: passwordless sign-in/sign-up, TOTP + hardware key + low-security SMS/email rows, recovery codes gated + hashed.
+- [ ] Visual check of Security Hub while signed in (needs a session).
