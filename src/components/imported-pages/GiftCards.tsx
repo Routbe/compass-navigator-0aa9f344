@@ -51,7 +51,7 @@ export default function GiftCards() {
   }, []);
 
   const effectiveAmount = useMemo(() => {
-    return clampGiftAmount(customAmount ? amount : amount);
+    return clampGiftAmount(amount);
   }, [amount, customAmount]);
 
   async function submit() {
