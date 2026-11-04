@@ -656,7 +656,7 @@ export default function AuthNeon({ initialMode = "magic" }: { initialMode?: Mode
                     onChange={(e) => setParentEmail(e.target.value)}
                     className="h-11 w-full rounded-lg border border-input bg-background px-3 text-sm text-foreground"
                   />
-                  <p className="text-[11px] leading-relaxed text-muted-foreground">Je bent jonger dan 16. Je ouder krijgt een mail om toestemming te geven en je veiligheidsinstellingen te beheren.</p>
+                  <p className="text-[11px] leading-relaxed text-muted-foreground">Je bent jonger dan 16. Je ouder krijgt een mail om toestemming te geven en je veiligheidsinstellingen te beheren. <Link to="/info/parental-consent" target="_blank" className="underline">Hoe werkt dat?</Link></p>
                 </div>
               )}
               <div className="flex items-start gap-2.5 rounded-lg border border-border p-3">

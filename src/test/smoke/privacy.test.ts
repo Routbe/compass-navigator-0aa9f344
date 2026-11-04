@@ -51,7 +51,7 @@ describe("privacy guarantees", () => {
 
   it("bundles no third-party error or analytics SDK", () => {
     const offenders = sources
-      .filter(({ code }) => /@sentry\/|posthog|mixpanel|google-analytics|gtag\(/i.test(code))
+      .filter(({ code }) => /@sentry\/|posthog|mixpanel|google-analytics|\bgtag\(/i.test(code))
       .map(({ file }) => path.relative(ROOT, file));
     expect(offenders).toEqual([]);
   });
