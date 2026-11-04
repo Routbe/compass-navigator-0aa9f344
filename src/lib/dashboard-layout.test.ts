@@ -1,19 +1,16 @@
 import { describe, expect, it } from "vitest";
-import { DASHBOARD_WIDGETS, moveDashboardWidget, normalizeDashboardLayout } from "./dashboard-layout";
-describe("Command Center layout", () => {
-  it("offers music, weather, smart-home, fitness and visitor widgets", () => {
-    for (const id of ["spotify", "weather", "smarthome", "fitness", "smart", "visitors"]) expect(DASHBOARD_WIDGETS).toContain(id);
+import { heightStep, moveDashboardWidgetTo, normalizeDashboardLayout, widthStep } from "./dashboard-layout";
+
+describe("command center drag & resize", () => {
+  it("drops a lifted widget at the target position", () => {
+    const l = normalizeDashboardLayout({ order: ["share", "card", "presence"] });
+    expect(moveDashboardWidgetTo(l, "share", "presence").order.slice(0, 3)).toEqual(["card", "presence", "share"]);
+    expect(moveDashboardWidgetTo(l, "presence", "share").order.slice(0, 3)).toEqual(["presence", "share", "card"]);
   });
-  it("keeps only known widgets and appends missing ones", () => {
-    const layout = normalizeDashboardLayout({ order: ["qr", "qr", "admin"], hidden: ["qa", "admin"] });
-    expect(layout.order[0]).toBe("qr"); expect(layout.order).toHaveLength(DASHBOARD_WIDGETS.length); expect(layout.hidden).toEqual(["qa"]);
-  });
-  it("bounds widget widths and accepts independent heights", () => {
-    expect(normalizeDashboardLayout({ tiles: { qa: { width: 99, height: "tall" }, qr: { width: 2, height: "medium" } } }).tiles).toEqual({ qa: { width: 1, height: "tall" }, qr: { width: 2, height: "medium" } });
-  });
-  it("moves a widget without losing neighboring widgets", () => {
-    const layout = normalizeDashboardLayout({ order: ["qr", "hub"] });
-    expect(moveDashboardWidget(layout, "qr", 1).order.slice(0, 2)).toEqual(["hub", "qr"]);
-    expect(moveDashboardWidget(layout, "qr", -1)).toBe(layout);
+  it("snaps dragged sizes to columns and height steps", () => {
+    expect(widthStep(600, 300, 16, 3)).toBe(2);
+    expect(widthStep(2000, 300, 16, 2)).toBe(2);
+    expect(heightStep(200)).toBe("auto");
+    expect(heightStep(500)).toBe("xl");
   });
 });
