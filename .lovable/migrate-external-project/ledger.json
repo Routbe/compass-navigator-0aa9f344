@@ -70,8 +70,8 @@
       "source": "~120 src/routes/api_*.ts handlers: oauth (token/introspect/revoke/userinfo), webhooks (stripe, telegram, bunq, weather, identity), provider callbacks (bluesky, mastodon, spotify, youtube, snapchat), ingest, og, presence, wallet render, health",
       "outcome": "preserve",
       "status": "partially_verified",
-      "evidence": "paths kept identical; /, /developers, /features, /compare, /guide, /contact, /claim, /self-hosting, /info/profiles, /auth/sign-in return 200; /api/public/health operational; /api/profiles/check-handle and /api/public/auth/providers answer from the live database; /about and /explore still 500 until the user's own Supabase is linked",
-      "next_action": "re-check /about and /explore after External Supabase is linked"
+      "evidence": "paths kept identical; /, /about, /about/platform, /explore, /developers, /features, /compare, /guide, /contact, /claim, /self-hosting, /info/profiles, /auth/sign-in, /dashboard return 200; /api/public/health operational; /api/profiles/check-handle and /api/public/auth/providers answer from the live database",
+      "next_action": "none"
     },
     {
       "capability": "schedules",
@@ -107,7 +107,7 @@
       "source": "build, tests, representative routes",
       "outcome": "partially_verified",
       "status": "partially_verified",
-      "evidence": "build OK; vitest 354/357 files pass (1979/1982 tests); homepage + 9 routes render in a headless browser; Neon read path, auth provider list, sign-in form and signed-out dashboard redirect verified live",
+      "evidence": "build OK; vitest 354/357 files pass (1979/1982 tests) plus 3 new attacher tests; homepage + 9 routes render in a headless browser; Neon read path, auth provider list, sign-in form and signed-out dashboard redirect verified live; /about and /explore render their real content (docs-routing test green)",
       "known_failures": [
         "src/test/docs-routing.test.ts /about -> HTTP 500 (missing SUPABASE_URL / SUPABASE_PUBLISHABLE_KEY)",
         "src/test/migration-replay.test.ts -> db/schema.snapshot.json stale vs migrations (pre-existing)",
