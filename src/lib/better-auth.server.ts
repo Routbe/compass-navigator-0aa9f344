@@ -3,6 +3,8 @@ import { hashCredential, verifyCredentialHash } from "@/lib/auth/credential-hash
 import { magicLink } from "better-auth/plugins/magic-link";
 import { genericOAuth } from "better-auth/plugins/generic-oauth";
 import { twoFactor } from "better-auth/plugins/two-factor";
+import { symmetricDecrypt } from "better-auth/crypto";
+import { hashedBackupCodeStore } from "@/lib/auth/backup-code-hash";
 import { passkey } from "@better-auth/passkey";
 import { GatewayPool, databaseTransport, hasDatabase } from "@/lib/neon";
 import { betterAuthDatabase } from "@/lib/neon-kysely.server";
@@ -255,6 +257,12 @@ export function createRoutAuth(request?: Request) {
     twoFactor({
       issuer: "ROUT",
       allowPasswordless: true,
+      // 10 one-time recovery codes, stored only as peppered PBKDF2 hashes.
+      backupCodeOptions: {
+        amount: 10,
+        length: 10,
+        storeBackupCodes: hashedBackupCodeStore(secret, (data) => symmetricDecrypt({ key: secret, data })),
+      },
       schema: { twoFactor: { modelName: "neon_auth.twoFactor" } },
     } as never),
     passkey({
@@ -315,6 +323,8 @@ export function createRoutAuth(request?: Request) {
       },
     },
     emailAndPassword: {
+      // Kept only so sign-up can create the account row; password sign-in is refused at the
+      // gateway and the password is erased right after sign-up (passwordless platform).
       enabled: true,
       minPasswordLength: 10,
       autoSignIn: true,

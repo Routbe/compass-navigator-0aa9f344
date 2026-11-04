@@ -198,7 +198,39 @@ export async function handleAuthRequest({ request }: { request: Request }) {
       if (refusal) return refusal;
     }
 
+    // Passwordless platform: no password sign-in or password changes.
+    if (request.method === "POST" && ["/sign-in/email", "/change-password", "/set-password", "/reset-password", "/request-password-reset", "/forget-password"].includes(relativePath)) {
+      return Response.json(
+        { code: "passwords_disabled", message: "ROUT werkt zonder wachtwoord. Log in met je passkey of een e-maillink." },
+        { status: 410, headers: { "cache-control": "no-store" } },
+      );
+    }
+    // Recovery codes are stored hashed: hash the submitted code before Better Auth compares.
+    if (request.method === "POST" && relativePath === "/two-factor/verify-backup-code") {
+      const body = (await request.clone().json().catch(() => ({}))) as Record<string, unknown>;
+      if (typeof body["code"] === "string") {
+        const { resolveAuthSecret } = await import("@/lib/better-auth.server");
+        const { hashBackupCode } = await import("@/lib/auth/backup-code-hash");
+        const pepper = resolveAuthSecret()?.secret ?? "";
+        const headers = new Headers(request.headers);
+        headers.delete("content-length");
+        request = new Request(request.url, { method: "POST", headers, body: JSON.stringify({ ...body, code: await hashBackupCode(body["code"], pepper) }) });
+      }
+    }
+    if (request.method === "POST" && relativePath === "/two-factor/view-backup-codes") {
+      return Response.json({ code: "not_available", message: "Herstelcodes worden alleen gehasht bewaard." }, { status: 410 });
+    }
+
     const res = await createRoutAuth(request).handler(request);
+    if (signupAge && res.ok) {
+      try {
+        const { sql } = await import("@/lib/neon");
+        await sql`update neon_auth.account a set password = null from neon_auth."user" u
+          where a."userId" = u.id and a."providerId" = 'credential' and lower(u.email) = lower(${signupAge.email})`;
+      } catch (e) {
+        console.error("[auth] erasing sign-up password failed", e instanceof Error ? e.message : e);
+      }
+    }
     if (signupAge && res.ok) {
       try {
         const { recordSignupAge } = await import("@/lib/minor-safety.server");
