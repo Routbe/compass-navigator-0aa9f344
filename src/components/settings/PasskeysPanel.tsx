@@ -13,6 +13,8 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { toast } from "sonner";
+import { requestStepUp } from "@/components/auth/StepUpDialog";
+import { refreshSessionFreshness } from "@/lib/auth/step-up.functions";
 import { addPasskey, deletePasskey, listPasskeys } from "@/lib/webauthn.functions";
 import { deviceLabelFrom } from "@/lib/passkey-label";
 import { passkeyErrorMessage } from "@/lib/passkey-errors";
@@ -90,7 +92,14 @@ export function PasskeysPanel() {
     setRegistering(true);
     setError(null);
     try {
-      const result = await addPasskey(deviceLabelFrom(navigator.userAgent));
+      const label = deviceLabelFrom(navigator.userAgent);
+      let result = await addPasskey(label);
+      if (!result.ok && (result.code === "SESSION_NOT_FRESH" || /not fresh/i.test(result.reason ?? ""))) {
+        // Re-verify instead of forcing a full sign-out/sign-in, then retry once.
+        if (!(await requestStepUp())) return;
+        await refreshSessionFreshness();
+        result = await addPasskey(label);
+      }
       if (!result.ok) {
         setError(result.reason ?? t("auth.settings.passkeys.registerError"));
         toast.error(result.reason ?? t("auth.settings.passkeys.registerError"));
