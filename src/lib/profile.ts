@@ -37,6 +37,14 @@ export interface ProfileBlock {
   kineticTheme?: "aurora" | "glass";
   /** Optional bento tile size; absent = the classic full-width row. */
   size?: BlockSize;
+  /** Plain links: show as a button row, as a logo under the bio, or both. Absent = follow the profile-wide link display. */
+  display?: LinkDisplay;
+}
+
+export type LinkDisplay = "button" | "icon" | "both";
+export function blockDisplay(b: Pick<ProfileBlock, "display">, profileMode: "rows" | "icons" | "both"): { button: boolean; icon: boolean } {
+  const d = b.display ?? (profileMode === "rows" ? "button" : profileMode === "icons" ? "icon" : "both");
+  return { button: d !== "icon", icon: d !== "button" };
 }
 
 export type BlockSize = "small" | "wide" | "large";

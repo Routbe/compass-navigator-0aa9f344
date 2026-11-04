@@ -86,6 +86,7 @@ export function sanitizeImportedBlock(raw: unknown): ProfileBlock | null {
   if (typeof raw["size"] === "string" && SIZES.has(raw["size"])) block.size = raw["size"] as ProfileBlock["size"];
   if (typeof raw["contentType"] === "string" && CONTENT_TYPES.has(raw["contentType"]))
     block.contentType = raw["contentType"] as ProfileBlock["contentType"];
+  if (raw["display"] === "button" || raw["display"] === "icon" || raw["display"] === "both") block.display = raw["display"];
   if (raw["kineticTheme"] === "aurora" || raw["kineticTheme"] === "glass") block.kineticTheme = raw["kineticTheme"];
   if (Array.isArray(raw["stats"])) {
     const stats = raw["stats"].filter((s): s is string => typeof s === "string").map((s) => s.slice(0, 40)).slice(0, 20);
