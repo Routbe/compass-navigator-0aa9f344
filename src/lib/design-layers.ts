@@ -59,6 +59,8 @@ export type DesignLayers = {
   decorations: Decoration[];
   identityOrder?: IdentityPart[];
   linkDisplay?: "rows" | "icons" | "both";
+  /** Logo bar under the bio with more than 5 logos: wrap onto extra rows or scroll like the Explore strip. */
+  iconBarMode?: "wrap" | "scroll";
 };
 
 export const SECTION_LABEL: Record<SectionId, string> = {
@@ -200,6 +202,7 @@ export function normalizeDesignLayers(raw: unknown): DesignLayers {
   return { version: 1, backgrounds, sections, blockStyles, decorations,
     ...(identityOrder.some((part, i) => part !== IDENTITY_PARTS[i]) ? { identityOrder } : {}),
     ...(["rows", "icons", "both"].includes(String(r["linkDisplay"])) ? { linkDisplay: r["linkDisplay"] as "rows" | "icons" | "both" } : {}),
+    ...(r["iconBarMode"] === "wrap" || r["iconBarMode"] === "scroll" ? { iconBarMode: r["iconBarMode"] } : {}),
   };
 }
 
@@ -209,7 +212,7 @@ export const serializeDesignLayers = (l: DesignLayers) => JSON.stringify(normali
 export function isEmptyLayers(l: DesignLayers): boolean {
   return (
     l.backgrounds.length === 0 &&
-    !l.identityOrder && !l.linkDisplay &&
+    !l.identityOrder && !l.linkDisplay && !l.iconBarMode &&
     l.decorations.length === 0 &&
     Object.keys(l.blockStyles).length === 0 &&
     l.sections.every((s, i) => s.id === DEFAULT_SECTIONS[i]?.id && s.visible)
