@@ -63,3 +63,22 @@ export const completeStepUp = createServerFn({ method: "POST" })
     await grantStepUp(context.userId, data.method);
     return { ok: true as const };
   });
+
+/**
+ * Better Auth refuses passkey registration when the session is older than its fresh age.
+ * After a successful step-up (signed cookie, ≤120 s) we mark the current session as freshly
+ * re-authenticated, which is exactly what a re-login would do, without signing the user out.
+ */
+export const refreshSessionFreshness = createServerFn({ method: "POST" })
+  .middleware([requireAuth])
+  .handler(async ({ context }) => {
+    const { ensureStepUpSession } = await import("./step-up.server");
+    await ensureStepUpSession(context.userId, "passkey_add");
+    const { getCookie } = await import("@tanstack/react-start/server");
+    const raw = getCookie("__Secure-better-auth.session_token") ?? getCookie("better-auth.session_token");
+    const token = raw ? decodeURIComponent(raw).split(".")[0] : "";
+    if (!token) throw new Error("Geen actieve sessie gevonden.");
+    const { sql } = await import("@/lib/neon");
+    await sql`update neon_auth.session set "createdAt" = now() where token = ${token} and "expiresAt" > now()`;
+    return { ok: true as const };
+  });
