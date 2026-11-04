@@ -12,3 +12,15 @@
 - [ ] Regenerate `db/schema.snapshot.json` (stale vs migrations: `agent_sandboxes`, 8 `rout_agent_sandbox_*` functions, `agent_workspace_claims` columns) — pre-existing in the source repo.
 - [ ] Fix `src/test/smoke/privacy.test.ts` false positive (`gtag\(` matches `qr.createSvgTag(`) — pre-existing in the source repo.
 - [ ] Decide cutover: does this project replace the original deployment (webhooks, cron, OAuth redirect URIs)?
+
+# Planning (user list, 2026-11-04)
+- [x] Remove the two `e2e-agent-` test workspaces from Neon.
+- [x] Cron purge route protected by LOVABLE_CRON_SECRET (401 without, 200 with). Open: an external scheduler must call it hourly (no Vercel cron here).
+- [ ] E2E claim flow with a real account (/studio/workspaces/claim) — needs a signed-in session.
+- [x] Parental consent page /info/parental-consent, in docs catalog, linked from sign-up.
+- [x] Translate all /info articles to en/fr/de (75 files).
+- [x] Fix "Session is not fresh" on Add passkey (step-up then retry).
+- [x] Privacy smoke test false positive fixed.
+- [ ] Keys: SMS gateway, Didit (DIDIT_API_KEY, DIDIT_WORKFLOW_ID, DIDIT_WEBHOOK_SECRET, IDENTITY_HASH_PEPPER), Google Wallet — user to supply.
+- [ ] Physical mobile tests (Snapchat share widget, cache invalidation) — user on device.
+- [ ] E2EE: Neon branch `feat-e2e-encryption` connection string — user.
