@@ -30,7 +30,7 @@ describe("admin email entry", () => {
   }
   it("allows configured owners", async () => {
     expect(await canUseAdminEmail(" OWNER@example.com ")).toBe(true);
-    expect((await request("/sign-in/email", "owner@example.com")).status).toBe(200);
+    expect((await request("/sign-in/magic-link", "owner@example.com")).status).toBe(200);
   });
   it("allows existing administrators", async () => {
     state.admin = true;
@@ -38,7 +38,13 @@ describe("admin email entry", () => {
   });
   it("does not block ordinary public sign-in", async () => {
     vi.stubEnv("APP_MODE", "public");
-    expect((await request("/sign-in/email", "member@example.com")).status).toBe(200);
+    expect((await request("/sign-in/magic-link", "member@example.com")).status).toBe(200);
+  });
+  it("refuses password sign-in: ROUT is passwordless", async () => {
+    vi.stubEnv("APP_MODE", "public");
+    const res = await request("/sign-in/email", "member@example.com");
+    expect(res.status).toBe(410);
+    expect((await res.json()).code).toBe("passwords_disabled");
   });
   it("refuses missing email and database failures", async () => {
     expect(await canUseAdminEmail(undefined)).toBe(false);
