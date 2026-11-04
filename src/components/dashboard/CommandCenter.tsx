@@ -1,11 +1,11 @@
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { QRCodeCanvas } from "qrcode.react";
 import { toast } from "sonner";
 import { useServerFn } from "@tanstack/react-start";
 import {
   ArrowRight,
-  ArrowUp,
-  ArrowDown,
+  GripVertical,
+  Pencil,
   ArrowUpRight,
   Check,
   Copy,
@@ -50,9 +50,10 @@ import { SpatialChoice } from "@/components/ui/spatial-choice";
 import { Input } from "@/components/ui/input";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { cn } from "@/lib/utils";
-import { DASHBOARD_WIDGETS, OPTIONAL_DASHBOARD_WIDGETS, normalizeDashboardLayout, moveDashboardWidget, type DashboardLayout, type DashboardTile, type DashboardWidgetId } from "@/lib/dashboard-layout";
+import { DASHBOARD_WIDGETS, OPTIONAL_DASHBOARD_WIDGETS, normalizeDashboardLayout, moveDashboardWidgetTo, heightStep, widthStep, type DashboardLayout, type DashboardTile, type DashboardWidgetId } from "@/lib/dashboard-layout";
 import { DashboardMusic, DashboardWeather, DashboardVisitors, UpcomingDashboardWidget } from "./ExternalDashboardWidgets";
-import { Select, SelectTrigger, SelectContent, SelectItem, SelectValue } from "@/components/ui/select";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
+import { getCommandCenterPrefs, saveCommandCenterPrefs } from "@/lib/dashboard-widgets.functions";
 import { i18n as trI18n } from "@/lib/i18n";
 import { ShareWidget, CardWidget } from "./ShareCardWidgets";
 import { useMyHandle } from "@/hooks/useMyHandle";
@@ -467,59 +468,195 @@ const WIDGET_LABEL: Record<WidgetId, string> = {
   visitors: "Bezoekers", spotify: "Spotify", weather: "Weer", smarthome: "Smarthome", fitness: "Fitness", smart: "Smart widgets",
 };
 
-/** Hidden widgets per device; the foundation for a rearrangeable board. */
+/** Board layout: saved on the ROUT profile (follows you across devices), cached locally for instant paint. */
 function useDashboardLayout(userId: string | undefined) {
   const key = userId ? `rout:dashboard-hidden:${userId}` : null;
+  const loadPrefs = useServerFn(getCommandCenterPrefs);
+  const savePrefs = useServerFn(saveCommandCenterPrefs);
+  const prefs = useQuery({ queryKey: ["cc-prefs", userId], enabled: !!userId, queryFn: () => loadPrefs(), staleTime: 60_000 });
   const [board, setBoard] = useState<DashboardLayout>(() => normalizeDashboardLayout({ hidden: [...OPTIONAL_DASHBOARD_WIDGETS] }));
+  const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(() => {
     if (!key) return;
     try {
       const raw = window.localStorage.getItem(key);
-      const next = key ? window.localStorage.getItem(`${key}:layout`) : null;
+      const next = window.localStorage.getItem(`${key}:layout`);
       setBoard(normalizeDashboardLayout(next ? JSON.parse(next) : { hidden: raw ? [...JSON.parse(raw), ...OPTIONAL_DASHBOARD_WIDGETS] : [...OPTIONAL_DASHBOARD_WIDGETS] }));
     } catch {
       /* ignore corrupt layout */
     }
   }, [key]);
+  useEffect(() => {
+    if (prefs.data?.layout) setBoard(normalizeDashboardLayout(prefs.data.layout));
+  }, [prefs.data?.layout]);
   const update = (change: (previous: DashboardLayout) => DashboardLayout) =>
     setBoard((prev) => {
       const next = normalizeDashboardLayout(change(prev));
       if (key) try { window.localStorage.setItem(`${key}:layout`, JSON.stringify(next)); } catch { /* unavailable device storage must not block editing */ }
+      if (saveTimer.current) clearTimeout(saveTimer.current);
+      saveTimer.current = setTimeout(() => { void savePrefs({ data: { layout: next } }).catch(() => toast.error("Indeling niet opgeslagen op je profiel.")); }, 600);
       return next;
     });
   const toggle = (id: WidgetId) => update(prev => ({ ...prev, hidden: prev.hidden.includes(id) ? prev.hidden.filter(x => x !== id) : [...prev.hidden, id] }));
-  const move = (id: WidgetId, direction: -1 | 1) => update(prev => moveDashboardWidget(prev, id, direction));
-  const resize = (id: WidgetId, patch: Partial<DashboardTile>) => update(prev => ({ ...prev, tiles: { ...prev.tiles, [id]: { width: 1, height: "auto", ...prev.tiles[id], ...patch } } }));
+  const moveTo = (id: WidgetId, target: WidgetId) => update(prev => moveDashboardWidgetTo(prev, id, target));
+  const resize = (id: WidgetId, patch: Partial<DashboardTile>) => update(prev => {
+    const cur = prev.tiles[id] ?? { width: 1, height: "auto" };
+    if ((patch.width ?? cur.width) === cur.width && (patch.height ?? cur.height) === cur.height) return prev;
+    return { ...prev, tiles: { ...prev.tiles, [id]: { ...cur, ...patch } } };
+  });
   const reset = () => update(() => normalizeDashboardLayout({ hidden: [...OPTIONAL_DASHBOARD_WIDGETS] }));
-  return { ...board, toggle, move, resize, reset };
+  return { ...board, toggle, moveTo, resize, reset, weatherCity: prefs.data?.weatherCity ?? null };
 }
 
-function Slot({ id, editing, hidden, onToggle, order, tile, onMove, onResize, className, children }: {
-  id: WidgetId; editing: boolean; hidden: boolean; onToggle: (id: WidgetId) => void; order: number; tile?: DashboardTile; onMove: (id: WidgetId, direction: -1 | 1) => void; onResize: (id: WidgetId, patch: Partial<DashboardTile>) => void; className?: string; children: ReactNode;
+const TILE_WIDTH = { 1: "sm:col-span-1", 2: "sm:col-span-2", 3: "sm:col-span-2 xl:col-span-3" } as const;
+const TILE_HEIGHT = { auto: "", medium: "min-h-72", tall: "min-h-96", xl: "min-h-[32rem]" } as const;
+
+function gridMetrics(el: HTMLElement) {
+  const grid = el.closest<HTMLElement>("[data-cc-grid]");
+  const cs = grid ? getComputedStyle(grid) : null;
+  const cols = cs ? cs.gridTemplateColumns.split(" ").filter(Boolean) : ["300px"];
+  return { columns: cols.length, columnPx: parseFloat(cols[0] ?? "300"), gapPx: cs ? parseFloat(cs.columnGap) || 16 : 16 };
+}
+
+function Slot({ id, editing, hidden, onToggle, order, tile, onMoveTo, onResize, onConfigure, dragging, onDragState, className, children }: {
+  id: WidgetId; editing: boolean; hidden: boolean; onToggle: (id: WidgetId) => void; order: number; tile?: DashboardTile;
+  onMoveTo: (id: WidgetId, target: WidgetId) => void; onResize: (id: WidgetId, patch: Partial<DashboardTile>) => void;
+  onConfigure?: (id: WidgetId) => void; dragging: WidgetId | null; onDragState: (id: WidgetId | null) => void; className?: string; children: ReactNode;
 }) {
+  const ref = useRef<HTMLDivElement>(null);
   if (hidden && !editing) return null;
+
+  const startDrag = (e: React.PointerEvent<HTMLElement>) => {
+    e.preventDefault();
+    (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+    onDragState(id);
+  };
+  const moveDrag = (e: React.PointerEvent<HTMLElement>) => {
+    if (dragging !== id) return;
+    const over = document.elementFromPoint(e.clientX, e.clientY)?.closest<HTMLElement>("[data-cc-slot]");
+    const target = over?.dataset["ccSlot"] as WidgetId | undefined;
+    if (target && target !== id) onMoveTo(id, target);
+  };
+  const endDrag = () => onDragState(null);
+
+  const startResize = (axis: "x" | "y" | "xy") => (e: React.PointerEvent<HTMLElement>) => {
+    const el = ref.current;
+    if (!el) return;
+    e.preventDefault();
+    e.stopPropagation();
+    const handle = e.currentTarget as HTMLElement;
+    handle.setPointerCapture(e.pointerId);
+    const rect = el.getBoundingClientRect();
+    const m = gridMetrics(el);
+    const sx = e.clientX, sy = e.clientY;
+    const onMove = (ev: PointerEvent) => {
+      const patch: Partial<DashboardTile> = {};
+      if (axis !== "y") patch.width = widthStep(rect.width + ev.clientX - sx, m.columnPx, m.gapPx, m.columns);
+      if (axis !== "x") patch.height = heightStep(rect.height + ev.clientY - sy);
+      onResize(id, patch);
+    };
+    const onUp = () => { handle.removeEventListener("pointermove", onMove); handle.removeEventListener("pointerup", onUp); handle.removeEventListener("pointercancel", onUp); };
+    handle.addEventListener("pointermove", onMove);
+    handle.addEventListener("pointerup", onUp);
+    handle.addEventListener("pointercancel", onUp);
+  };
+
+  const label = WIDGET_LABEL[id];
   return (
-    <div data-tour={`cc-${id}`} style={{ order }} className={cn("relative min-w-0 flex flex-col", editing && "rounded-lg ring-1 ring-border", hidden && "opacity-40", tile ? ({ 1: "sm:col-span-1", 2: "sm:col-span-2", 3: "sm:col-span-2 xl:col-span-3" }[tile.width]) : className, tile?.height === "medium" && "min-h-72", tile?.height === "tall" && "min-h-96")}>
+    <div
+      ref={ref}
+      data-tour={`cc-${id}`}
+      data-cc-slot={id}
+      style={{ order }}
+      className={cn(
+        "relative min-w-0 flex flex-col transition-[box-shadow,transform,opacity] duration-150",
+        editing && "rounded-xl ring-1 ring-border",
+        dragging === id && "z-20 scale-[1.02] opacity-90 shadow-2xl ring-2 ring-primary",
+        dragging && dragging !== id && "ring-dashed",
+        hidden && "opacity-40",
+        tile ? TILE_WIDTH[tile.width] : className,
+        tile && TILE_HEIGHT[tile.height],
+      )}
+    >
       {editing ? (
-        <div className="flex flex-wrap items-center gap-1 p-2">
-        <Button size="icon" variant="ghost" className="size-7" disabled={order === 0} aria-label={`${WIDGET_LABEL[id]} naar voren`} onClick={() => onMove(id, -1)}><ArrowUp className="size-3.5" /></Button>
-        <Button size="icon" variant="ghost" className="size-7" disabled={order === DASHBOARD_WIDGETS.length - 1} aria-label={`${WIDGET_LABEL[id]} naar achteren`} onClick={() => onMove(id, 1)}><ArrowDown className="size-3.5" /></Button>
-        <Select value={String(tile?.width ?? 1)} onValueChange={v => onResize(id, { width: Number(v) as 1 | 2 | 3 })}><SelectTrigger className="h-7 w-16 text-xs" aria-label={`${WIDGET_LABEL[id]} breedte`}><SelectValue /></SelectTrigger><SelectContent><SelectItem value="1">1 kolom</SelectItem><SelectItem value="2">2 kolommen</SelectItem><SelectItem value="3">3 kolommen</SelectItem></SelectContent></Select>
-        <Select value={tile?.height ?? "auto"} onValueChange={v => onResize(id, { height: v as DashboardTile["height"] })}><SelectTrigger className="h-7 w-20 text-xs" aria-label={`${WIDGET_LABEL[id]} hoogte`}><SelectValue /></SelectTrigger><SelectContent><SelectItem value="auto">Auto</SelectItem><SelectItem value="medium">Hoog</SelectItem><SelectItem value="tall">Extra hoog</SelectItem></SelectContent></Select>
-        <Button
-          size="sm"
-          variant="secondary"
-          className="ml-auto h-7 gap-1 text-xs"
-          onClick={() => onToggle(id)}
-          aria-label={`${WIDGET_LABEL[id]} ${hidden ? "tonen" : "verbergen"}`}
-        >
-          {hidden ? <Eye className="h-3.5 w-3.5" /> : <EyeOff className="h-3.5 w-3.5" />}
-          {hidden ? "Tonen" : "Verbergen"}
-        </Button>
+        <div className="flex items-center gap-1 p-2">
+          <button
+            type="button"
+            className="flex h-7 cursor-grab touch-none items-center gap-1 rounded-md px-1.5 text-xs text-muted-foreground hover:bg-muted active:cursor-grabbing"
+            aria-label={`${label} verslepen`}
+            title="Sleep om te verplaatsen"
+            onPointerDown={startDrag}
+            onPointerMove={moveDrag}
+            onPointerUp={endDrag}
+            onPointerCancel={endDrag}
+          >
+            <GripVertical className="size-4" /> {label}
+          </button>
+          <Button size="sm" variant="secondary" className="ml-auto h-7 gap-1 text-xs" onClick={() => onToggle(id)} aria-label={`${label} ${hidden ? "tonen" : "verbergen"}`}>
+            {hidden ? <Eye className="h-3.5 w-3.5" /> : <EyeOff className="h-3.5 w-3.5" />}
+            {hidden ? "Tonen" : "Verbergen"}
+          </Button>
         </div>
       ) : null}
-      <div className="flex min-w-0 flex-1 flex-col [&>*]:flex-1">{!hidden && children}</div>
+      <div className={cn("flex min-w-0 flex-1 flex-col [&>*]:flex-1", editing && "pointer-events-none select-none")}>{!hidden && children}</div>
+      {editing && !hidden && onConfigure ? (
+        <Button
+          type="button"
+          size="icon"
+          className="absolute left-1/2 top-1/2 z-10 size-12 -translate-x-1/2 -translate-y-1/2 rounded-full shadow-lg"
+          aria-label={`${label} instellen`}
+          title={`${label} instellen`}
+          onClick={() => onConfigure(id)}
+        >
+          <Pencil className="size-5" />
+        </Button>
+      ) : null}
+      {editing && !hidden ? (
+        <>
+          <span role="separator" aria-label={`${label} breder of smaller slepen`} onPointerDown={startResize("x")} className="absolute -right-1.5 top-10 bottom-4 z-10 w-3 cursor-ew-resize touch-none rounded-full hover:bg-primary/30" />
+          <span role="separator" aria-label={`${label} hoger of lager slepen`} onPointerDown={startResize("y")} className="absolute -bottom-1.5 left-4 right-4 z-10 h-3 cursor-ns-resize touch-none rounded-full hover:bg-primary/30" />
+          <span aria-label={`${label} vergroten`} onPointerDown={startResize("xy")} className="absolute -bottom-1 -right-1 z-10 size-5 cursor-nwse-resize touch-none rounded-br-xl border-b-2 border-r-2 border-primary" />
+        </>
+      ) : null}
     </div>
+  );
+}
+
+function WeatherLocationDialog({ open, current, onClose, userId }: { open: boolean; current: string | null; onClose: () => void; userId: string }) {
+  const save = useServerFn(saveCommandCenterPrefs);
+  const qc = useQueryClient();
+  const [city, setCity] = useState(current ?? "");
+  const [busy, setBusy] = useState(false);
+  useEffect(() => { if (open) setCity(current ?? ""); }, [open, current]);
+  const valid = city.trim().length >= 2;
+  return (
+    <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Locatie voor het weer</DialogTitle>
+          <DialogDescription>Je stelt dit één keer in; het wordt bewaard op je ROUT-profiel.</DialogDescription>
+        </DialogHeader>
+        <form id="weather-loc" onSubmit={async (e) => {
+          e.preventDefault();
+          if (!valid || busy) return;
+          setBusy(true);
+          try {
+            await save({ data: { weatherCity: city.trim() } });
+            await qc.invalidateQueries({ queryKey: ["cc-prefs", userId] });
+            toast.success("Locatie bewaard.");
+            onClose();
+          } catch {
+            toast.error("Locatie niet bewaard. Gebruik enkel letters, cijfers en leestekens.");
+          } finally { setBusy(false); }
+        }}>
+          <Input autoFocus aria-label="Stad" placeholder="Bijv. Gent" value={city} maxLength={80} onChange={(e) => setCity(e.target.value)} />
+        </form>
+        <DialogFooter>
+          <Button variant="ghost" onClick={onClose}>Annuleren</Button>
+          <Button type="submit" form="weather-loc" disabled={!valid || busy}>{busy ? <Loader2 className="size-4 animate-spin" /> : null} Bewaren</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
 
@@ -536,6 +673,8 @@ export function CommandCenter() {
   const [isEditingDashboard, setIsEditingDashboard] = useState(false);
   const layout = useDashboardLayout(user?.id);
   const myHandle = useMyHandle();
+  const [dragging, setDragging] = useState<WidgetId | null>(null);
+  const [configuring, setConfiguring] = useState<WidgetId | null>(null);
 
   if (!user || (!state.data && state.syncing)) {
     return (
@@ -558,7 +697,12 @@ export function CommandCenter() {
     ...(!c?.guestbook30d ? [{ label: "Prikbord: 0", to: "/dashboard/bluesky" }] : []),
     ...(!c?.upcomingBookings ? [{ label: "Agenda: 0", to: "/agenda" }] : []),
   ];
-  const slot = (id: WidgetId) => ({ editing: isEditingDashboard, hidden: layout.hidden.includes(id), onToggle: layout.toggle, order: layout.order.indexOf(id), tile: layout.tiles[id], onMove: layout.move, onResize: layout.resize });
+  const configurable: Partial<Record<WidgetId, (id: WidgetId) => void>> = {
+    weather: () => setConfiguring("weather"),
+    spotify: () => { window.location.href = "/studio"; },
+    hub: () => { window.location.href = "/studio"; },
+  };
+  const slot = (id: WidgetId) => ({ editing: isEditingDashboard, hidden: layout.hidden.includes(id), onToggle: layout.toggle, order: layout.order.indexOf(id), tile: layout.tiles[id], onMoveTo: layout.moveTo, onResize: layout.resize, onConfigure: configurable[id], dragging, onDragState: setDragging });
 
   return (
     <AppLayout
@@ -597,7 +741,7 @@ export function CommandCenter() {
         <Button variant="ghost" size="sm" onClick={layout.reset}>Indeling herstellen</Button>
       </div>}
       <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_340px]">
-        <div className="grid auto-rows-min gap-4 sm:grid-cols-2 xl:grid-cols-3">
+        <div data-cc-grid className="grid auto-rows-min gap-4 sm:grid-cols-2 xl:grid-cols-3">
           <SystemPulse items={pulse} />
 
           {showRelays || isEditingDashboard ? (
@@ -665,7 +809,7 @@ export function CommandCenter() {
           <Slot id="connections" {...slot("connections")}><Widget to="/dashboard/identity" icon={Fingerprint} eyebrow="Gekoppelde apps" title={c?.connectedApps === null || c?.connectedApps === undefined ? "—" : plural(c.connectedApps, "app", "apps")} hint="Actieve toestemmingen voor je identiteit." /></Slot>
           <Slot id="visitors" {...slot("visitors")}><DashboardVisitors userId={user.id} /></Slot>
           <Slot id="spotify" {...slot("spotify")}><DashboardMusic userId={user.id} /></Slot>
-          <Slot id="weather" {...slot("weather")}><DashboardWeather /></Slot>
+          <Slot id="weather" {...slot("weather")}><DashboardWeather city={layout.weatherCity} /></Slot>
           {(["smarthome", "fitness", "smart"] as const).map(id => <Slot key={id} id={id} {...slot(id)}><UpcomingDashboardWidget title={WIDGET_LABEL[id]} /></Slot>)}
         </div>
 
@@ -676,6 +820,7 @@ export function CommandCenter() {
           Lokaal gesynchroniseerd {relative(new Date(state.savedAt).toISOString())}
         </p>
       ) : null}
+      <WeatherLocationDialog open={configuring === "weather"} current={layout.weatherCity} userId={user.id} onClose={() => setConfiguring(null)} />
     </AppLayout>
   );
 }

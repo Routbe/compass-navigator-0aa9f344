@@ -26,3 +26,42 @@ export const getDashboardWeather = createServerFn({ method: "POST" }).middleware
       return { ok: true as const, city: location.name, country: location.country ?? "", ...weather.current };
     } catch { return { ok: false as const, error: "provider_unavailable" }; }
   });
+
+const prefsSchema = z.object({
+  layout: z.unknown().optional(),
+  weatherCity: z.string().trim().min(2).max(80).regex(/^[\p{L}\p{N} .,'’-]+$/u).nullable().optional(),
+});
+
+/** Command Center preferences live on the ROUT profile (display_prefs.commandCenter), so they follow the member across devices. */
+export const getCommandCenterPrefs = createServerFn({ method: "GET" }).middleware([requireAuth]).handler(async ({ context }) => {
+  const { sql } = await import("@/lib/neon");
+  const rows = await sql`select display_prefs -> 'commandCenter' as cc from public.profiles where id = ${context.userId}`;
+  const cc = (rows[0]?.["cc"] ?? {}) as { layout?: unknown; weatherCity?: string | null };
+  return { layout: cc.layout ?? null, weatherCity: typeof cc.weatherCity === "string" ? cc.weatherCity : null };
+});
+
+export const saveCommandCenterPrefs = createServerFn({ method: "POST" }).middleware([requireAuth])
+  .inputValidator((input: unknown) => prefsSchema.parse(input))
+  .handler(async ({ data, context }) => {
+    const { sql } = await import("@/lib/neon");
+    const { normalizeDashboardLayout } = await import("./dashboard-layout");
+    const patch: Record<string, unknown> = {};
+    if (data.layout !== undefined) patch["layout"] = normalizeDashboardLayout(data.layout);
+    if (data.weatherCity !== undefined) patch["weatherCity"] = data.weatherCity;
+    await sql`update public.profiles set display_prefs = jsonb_set(coalesce(display_prefs, '{}'::jsonb), '{commandCenter}',
+      coalesce(display_prefs -> 'commandCenter', '{}'::jsonb) || ${JSON.stringify(patch)}::jsonb, true) where id = ${context.userId}`;
+    return { ok: true as const };
+  });
+
+/** Every service linked to the ROUT profile (Studio, Command Center or Hub), for the account overview. Never returns tokens. */
+export const getAllMyLinkedServices = createServerFn({ method: "GET" }).middleware([requireAuth]).handler(async ({ context }) => {
+  const { sql } = await import("@/lib/neon");
+  const [presence, integrations] = await Promise.all([
+    sql`select provider, show_on_profile, created_at from public.user_presence_connections where user_id = ${context.userId}`.catch(() => []),
+    sql`select provider, visible, coalesce(connection_status, 'connected') as status, created_at from public.user_integrations where user_id = ${context.userId}`.catch(() => []),
+  ]);
+  const map = new Map<string, { provider: string; status: string; publicOnProfile: boolean }>();
+  for (const r of integrations as Record<string, unknown>[]) map.set(String(r["provider"]), { provider: String(r["provider"]), status: String(r["status"]), publicOnProfile: Boolean(r["visible"]) });
+  for (const r of presence as Record<string, unknown>[]) map.set(String(r["provider"]), { provider: String(r["provider"]), status: "connected", publicOnProfile: Boolean(r["show_on_profile"]) });
+  return [...map.values()].sort((a, b) => a.provider.localeCompare(b.provider));
+});

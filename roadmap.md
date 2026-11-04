@@ -26,3 +26,12 @@
 - [ ] E2EE: Neon branch `feat-e2e-encryption` connection string — user.
 - [x] Security Hub: passwordless sign-in/sign-up, TOTP + hardware key + low-security SMS/email rows, recovery codes gated + hashed.
 - [ ] Visual check of Security Hub while signed in (needs a session).
+
+## Nov 4 batch
+- [x] Gift cards: only fixed amounts (buyer can't set price)
+- [x] YouTube push verify: per-channel token, no probing of linked channels
+- [x] Command Center: drag to move, edge/corner resize, pencil per tile, layout saved on profile
+- [x] Weather: location saved once on profile, change via pencil
+- [x] Spotify widget: album art, progress, clear status
+- [x] Account settings: "Gekoppelde diensten" overview
+- [ ] Google Wallet premium tile/icon check — waiting on GOOGLE_SERVICE_ACCOUNT_EMAIL, GOOGLE_PRIVATE_KEY, GOOGLE_WALLET_ISSUER_ID, GOOGLE_WALLET_CLASS_ID

@@ -284,7 +284,7 @@ export async function subscribeYouTubePush(userId: string, origin?: Request | st
   const body = new URLSearchParams({
     "hub.mode": "subscribe",
     "hub.topic": feedTopic(channelId),
-    "hub.callback": `${base}/api/public/youtube/push`,
+    "hub.callback": `${base}/api/public/youtube/push?t=${hubSecret(await hubServerSecret(), `cb:${channelId}`).slice(0, 32)}`,
     "hub.secret": hubSecret(await hubServerSecret(), channelId),
     "hub.lease_seconds": String(10 * 24 * 3600),
   });
@@ -294,9 +294,16 @@ export async function subscribeYouTubePush(userId: string, origin?: Request | st
 }
 
 /** True when the topic belongs to a connected channel (hub verify challenge). */
-export async function isKnownYouTubeTopic(topic: string): Promise<boolean> {
+/** Verifies the per-channel callback token; no DB lookup, so nobody can probe which channels are linked. */
+export async function isKnownYouTubeTopic(topic: string, token = ""): Promise<boolean> {
   const cid = /channel_id=([\w-]{10,40})/.exec(topic)?.[1];
   if (!cid) return false;
+  const { hubSecret } = await import("./youtube-presence");
+  const want = hubSecret(await hubServerSecret(), `cb:${cid}`).slice(0, 32);
+  if (token.length !== want.length) return false;
+  let diff = 0;
+  for (let i = 0; i < want.length; i++) diff |= want.charCodeAt(i) ^ token.charCodeAt(i);
+  if (diff !== 0) return false;
   const rows = await sql`select 1 from public.user_integrations
     where provider = 'youtube' and youtube_card_json->>'channelId' = ${cid} limit 1`;
   return rows.length > 0;
