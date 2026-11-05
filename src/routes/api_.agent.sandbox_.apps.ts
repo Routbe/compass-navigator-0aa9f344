@@ -15,11 +15,9 @@ export const Route = createFileRoute("/api_/agent/sandbox_/apps")({
         const { agentError, agentOk } = await import("@/lib/agent/responses");
         if (!ctx.workspaceId) return agentError(404, "not_found", "Create the workspace first.");
         const { sandboxAppsInput } = await import("@/lib/agent/agent-sandbox");
-        const parsed = sandboxAppsInput.safeParse(await request.json().catch(() => null));
-        if (!parsed.success) {
-          const issue = parsed.error.issues[0];
-          return agentError(400, "invalid_request", `${issue?.path.join(".") || "body"}: ${issue?.message ?? "invalid"}`);
-        }
+        const rawBody: unknown = await request.json().catch(() => null);
+        const parsed = sandboxAppsInput.safeParse(rawBody);
+        if (!parsed.success) return (await import("@/lib/agent/responses")).agentValidationError(parsed.error, rawBody);
         try {
           const n = await setSandboxApps(ctx, parsed.data.apps);
           return agentOk({ apps: n, note: "Apps go live with a client secret only after the human claims the workspace." });
