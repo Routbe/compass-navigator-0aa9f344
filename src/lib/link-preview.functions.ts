@@ -23,6 +23,17 @@ export const fetchLinkPreview = createServerFn({ method: "POST" })
     if (target.protocol !== "https:" && target.protocol !== "http:") {
       return { ok: false as const, reason: "invalid_url" as const };
     }
+    // Only well-known media/book/music sites may be previewed — no arbitrary outbound fetches.
+    const ALLOWED = [
+      "imdb.com", "themoviedb.org", "letterboxd.com", "rottentomatoes.com", "netflix.com",
+      "disneyplus.com", "primevideo.com", "amazon.com", "goodreads.com", "bol.com",
+      "openlibrary.org", "books.google.com", "spotify.com", "music.apple.com", "tv.apple.com",
+      "deezer.com", "soundcloud.com", "youtube.com", "youtu.be", "steampowered.com", "myanimelist.net",
+    ];
+    const host = target.hostname.toLowerCase().replace(/\.$/, "");
+    if (!ALLOWED.some((d) => host === d || host.endsWith(`.${d}`))) {
+      return { ok: false as const, reason: "blocked_host" as const };
+    }
     const { assertPublicHost, safePublicFetch } = await import("./safe-fetch.server");
     if (!(await assertPublicHost(target.hostname))) {
       return { ok: false as const, reason: "blocked_host" as const };
