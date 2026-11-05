@@ -2,6 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { optionalAuth, requireAuth } from "@/lib/auth/middleware";
 import { GIFT_PRESETS } from "./gift-cards";
+import { trustedOrigin } from "./safe-redirect";
 
 const purchaseSchema = z.object({
   // Only fixed denominations: the buyer must never choose the charged amount.
@@ -43,7 +44,11 @@ export const startGiftCardPurchase = createServerFn({ method: "POST" })
         giftId: order.id,
         amountCents: data.amountCents,
         email: data.purchaserEmail,
-        origin: data.origin,
+        // Only our own origins may receive the buyer after checkout.
+        origin:
+          trustedOrigin(data.origin, { allowDev: true }) ??
+          process.env["PUBLIC_ORIGIN"] ??
+          "https://rout.be",
       });
       return { ok: true as const, url, code: order.code };
     } catch (error) {
