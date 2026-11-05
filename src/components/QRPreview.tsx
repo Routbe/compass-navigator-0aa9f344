@@ -38,6 +38,15 @@ import {
 } from "@/lib/export-telemetry";
 import { i18n as trI18n } from "@/lib/i18n";
 
+/** Only plain hex / rgb(a) colors may reach the frame SVG markup (blocks injected presets). */
+function safeSvgColor(value: unknown, fallback: string): string {
+  if (typeof value !== "string") return fallback;
+  const v = value.trim();
+  if (/^#[0-9a-fA-F]{3,8}$/.test(v)) return v;
+  if (/^rgba?\(\s*[\d.]+%?\s*,\s*[\d.]+%?\s*,\s*[\d.]+%?\s*(,\s*[\d.]+%?\s*)?\)$/.test(v)) return v;
+  return fallback;
+}
+
 /** Structured diagnostics attached to a failed export. */
 interface ExportDiagnostics {
   message: string;
@@ -427,8 +436,8 @@ export function QRPreview({
   const frameSvg = activeFrame
     ? applyFrameTweaks(
         activeFrame.render({
-          color: fgColor,
-          bg: effectiveBgForFrame,
+          color: safeSvgColor(fgColor, "#000000"),
+          bg: safeSvgColor(effectiveBgForFrame, "#FFFFFF"),
           label: frameLabel || activeFrame.defaultLabel,
           font: frameFontStack(frameFont) ?? undefined,
         }),
