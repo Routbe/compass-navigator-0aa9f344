@@ -61,6 +61,14 @@ export function paymentRequired(input: { reason: string; upgradeUrl: string; lim
   );
 }
 
+/** 400 with compiler-grade diagnostics (path, rejected value, JSON-Patch fix). */
+export async function agentValidationError(error: import("zod").ZodError, body: unknown): Promise<Response> {
+  const { diagnosticBody } = await import("./diagnostics");
+  const extra = diagnosticBody(error, body);
+  const msg = typeof extra["path"] === "string" ? `${extra["path"]}: ${String(extra["message"] ?? "invalid")}` : "Invalid request body.";
+  return agentError(400, "invalid_request", msg, extra);
+}
+
 export function agentOk(body: Record<string, unknown>, status = 200): Response {
   return new Response(JSON.stringify({ status: "ok", ...body }), { status, headers: JSON_HEADERS });
 }
