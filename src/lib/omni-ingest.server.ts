@@ -7,6 +7,19 @@ export async function sha256Hex(value: string): Promise<string> {
   return [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, "0")).join("");
 }
 
+/**
+ * Only approved source hosts (OMNI_RENDER_HOSTS, same list the worker uses)
+ * may be persisted as fetch destinations. Empty list = nothing allowed.
+ */
+export function isApprovedOmniSource(raw: string): boolean {
+  let url: URL;
+  try { url = new URL(raw); } catch { return false; }
+  if (url.protocol !== "https:" || url.username || url.password || (url.port && url.port !== "443")) return false;
+  const host = url.hostname.toLowerCase().replace(/\.$/, "");
+  const allowed = (process.env["OMNI_RENDER_HOSTS"] ?? "").split(",").map((h) => h.trim().toLowerCase()).filter(Boolean);
+  return allowed.some((a) => host === a || host.endsWith(`.${a}`));
+}
+
 export async function enqueueOmniJob(input: {
   userId: string;
   source: "studio" | "webhook";
@@ -14,6 +27,9 @@ export async function enqueueOmniJob(input: {
   title?: string;
   mediaUrl?: string;
 }): Promise<string> {
+  if (!isApprovedOmniSource(input.url) || (input.mediaUrl && !isApprovedOmniSource(input.mediaUrl))) {
+    throw Object.assign(new Error("host_not_allowed"), { status: 400 });
+  }
   const recent = (await sql`select count(*)::int as n from public.omni_jobs
     where user_id=${input.userId} and created_at > now() - interval '1 hour'`) as { n: number }[];
   if (Number(recent[0]?.n ?? 0) >= 60) throw Object.assign(new Error("rate_limited"), { status: 429 });
