@@ -16,11 +16,9 @@ export const Route = createFileRoute("/api_/agent/sandbox_/profile")({
         const { agentError, agentOk } = await import("@/lib/agent/responses");
         if (!ctx.workspaceId) return agentError(404, "not_found", "Create the workspace first.");
         const { sandboxProfileInput, splitProfilePatch } = await import("@/lib/agent/agent-sandbox");
-        const parsed = sandboxProfileInput.safeParse(await request.json().catch(() => null));
-        if (!parsed.success) {
-          const issue = parsed.error.issues[0];
-          return agentError(400, "invalid_request", `${issue?.path.join(".") || "body"}: ${issue?.message ?? "invalid"}`);
-        }
+        const rawBody: unknown = await request.json().catch(() => null);
+        const parsed = sandboxProfileInput.safeParse(rawBody);
+        if (!parsed.success) return (await import("@/lib/agent/responses")).agentValidationError(parsed.error, rawBody);
         try {
           const { fields, prefs } = splitProfilePatch(parsed.data);
           const revision = await patchSandboxProfile(ctx, fields, prefs);

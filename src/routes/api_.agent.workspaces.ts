@@ -17,11 +17,9 @@ export const Route = createFileRoute("/api_/agent/workspaces")({
         const agent = await authenticateAgent(request, "assets:write");
         if (agent instanceof Response) return agent;
         const { agentError, agentOk } = await import("@/lib/agent/responses");
-        const parsed = agentProvisionInput.safeParse(await request.json().catch(() => null));
-        if (!parsed.success) {
-          const issue = parsed.error.issues[0];
-          return agentError(400, "invalid_request", `${issue?.path.join(".") || "body"}: ${issue?.message ?? "invalid"}`);
-        }
+        const rawBody: unknown = await request.json().catch(() => null);
+        const parsed = agentProvisionInput.safeParse(rawBody);
+        if (!parsed.success) return (await import("@/lib/agent/responses")).agentValidationError(parsed.error, rawBody);
         try {
           const { provisionAgentWorkspace } = await import("@/lib/agent/agent-workspaces.server");
           const ws = await provisionAgentWorkspace({

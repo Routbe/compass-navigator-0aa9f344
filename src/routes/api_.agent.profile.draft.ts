@@ -25,11 +25,9 @@ export const Route = createFileRoute("/api_/agent/profile/draft")({
         const agent = await authenticateAgent(request, "profile:draft");
         if (agent instanceof Response) return agent;
         const { agentError, humanActionRequired } = await import("@/lib/agent/responses");
-        const parsed = bodySchema.safeParse(await request.json().catch(() => null));
-        if (!parsed.success) {
-          const issue = parsed.error.issues[0];
-          return agentError(400, "invalid_request", `${issue?.path.join(".") || "body"}: ${issue?.message ?? "invalid"}`);
-        }
+        const rawBody: unknown = await request.json().catch(() => null);
+        const parsed = bodySchema.safeParse(rawBody);
+        if (!parsed.success) return (await import("@/lib/agent/responses")).agentValidationError(parsed.error, rawBody);
         const { space, blocks, theme, cardStyle, ...meta } = parsed.data;
         const { parsePatch, profileMetaPatchSchema, profileThemePatchSchema, profileLinksPatchSchema } = await import("@/lib/profile-draft-patch");
         const checks = [

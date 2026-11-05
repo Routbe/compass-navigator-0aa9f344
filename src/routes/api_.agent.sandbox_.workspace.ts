@@ -16,11 +16,9 @@ export const Route = createFileRoute("/api_/agent/sandbox_/workspace")({
         const { agentError, agentOk } = await import("@/lib/agent/responses");
         if (ctx.workspaceId) return agentError(400, "invalid_request", "This sandbox already has a workspace. One sandbox = one workspace.");
         const { agentProvisionInput, claimUrl } = await import("@/lib/agent/agent-claims");
-        const parsed = agentProvisionInput.safeParse(await request.json().catch(() => null));
-        if (!parsed.success) {
-          const issue = parsed.error.issues[0];
-          return agentError(400, "invalid_request", `${issue?.path.join(".") || "body"}: ${issue?.message ?? "invalid"}`);
-        }
+        const rawBody: unknown = await request.json().catch(() => null);
+        const parsed = agentProvisionInput.safeParse(rawBody);
+        if (!parsed.success) return (await import("@/lib/agent/responses")).agentValidationError(parsed.error, rawBody);
         try {
           const { provisionSandboxWorkspace, claimQrSvg } = await import("@/lib/agent/agent-sandbox.server");
           const { publicOrigin } = await import("@/lib/agent/agent-auth.server");

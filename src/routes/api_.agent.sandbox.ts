@@ -29,8 +29,9 @@ export const Route = createFileRoute("/api_/agent/sandbox")({
         const limited = await guardShared(request, "agent-sandbox-register", { limit: 10, windowSec: 3600 });
         if (limited) return limited;
         const { sandboxRegisterInput } = await import("@/lib/agent/agent-sandbox");
-        const parsed = sandboxRegisterInput.safeParse(await request.json().catch(() => null));
-        if (!parsed.success) return agentError(400, "invalid_request", "Body must be exactly { challenge, solution, agent_name }.");
+        const rawBody: unknown = await request.json().catch(() => null);
+        const parsed = sandboxRegisterInput.safeParse(rawBody);
+        if (!parsed.success) return (await import("@/lib/agent/responses")).agentValidationError(parsed.error, rawBody);
         try {
           const { registerSandbox } = await import("@/lib/agent/agent-sandbox.server");
           const s = await registerSandbox({ challenge: parsed.data.challenge, solution: parsed.data.solution, agentName: parsed.data.agent_name, ip: clientIp(request) });

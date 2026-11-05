@@ -21,11 +21,9 @@ export const Route = createFileRoute("/api_/agent/links")({
         const agent = await authenticateAgent(request, "assets:write");
         if (agent instanceof Response) return agent;
         const { agentError, agentOk, paymentRequired } = await import("@/lib/agent/responses");
-        const parsed = bodySchema.safeParse(await request.json().catch(() => null));
-        if (!parsed.success) {
-          const issue = parsed.error.issues[0];
-          return agentError(400, "invalid_request", `${issue?.path.join(".") || "body"}: ${issue?.message ?? "invalid"}`);
-        }
+        const rawBody: unknown = await request.json().catch(() => null);
+        const parsed = bodySchema.safeParse(rawBody);
+        if (!parsed.success) return (await import("@/lib/agent/responses")).agentValidationError(parsed.error, rawBody);
         const { shortLinkTargetBlocked } = await import("@/lib/short-link-target");
         if (shortLinkTargetBlocked(parsed.data.target_url)) return agentError(400, "invalid_request", "This target URL is not allowed.");
         try {
