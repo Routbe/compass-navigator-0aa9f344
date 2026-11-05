@@ -3,7 +3,11 @@ import { beforeEach, expect, it, vi } from "vitest";
 const query = vi.hoisted(() => vi.fn());
 vi.mock("@/lib/neon", () => ({ sql: query }));
 import { enqueueOmniJob, listOmniJobs } from "./omni-ingest.server";
-beforeEach(() => { query.mockReset(); });
+beforeEach(() => { query.mockReset(); process.env.OMNI_RENDER_HOSTS = "example.com"; });
+it("rejects unapproved hosts before any database write", async () => {
+  await expect(enqueueOmniJob({ userId: "22222222-2222-4222-8222-222222222222", source: "studio", url: "https://169.254.169.254.nip.io/x" })).rejects.toThrow("host_not_allowed");
+  expect(query).not.toHaveBeenCalled();
+});
 it("acknowledges only a persisted id without starting source processing", async () => {
   query.mockResolvedValueOnce([{ n: 0 }]).mockResolvedValueOnce([{ id: "11111111-1111-4111-8111-111111111111" }]);
   const fetch = vi.spyOn(globalThis, "fetch").mockRejectedValue(new Error("source_fetch_forbidden"));
