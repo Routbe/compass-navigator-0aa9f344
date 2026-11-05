@@ -87,10 +87,11 @@ describe("member profile write allowlist", () => {
     expect((await authorizeQuery({ ...update({ verified: true }), action }, memberId)).ok).toBe(false);
   });
 
-  it("preserves administrative writes only with a server-resolved admin role", async () => {
+  it("strips protected fields even from administrator browser writes", async () => {
     query.mockResolvedValue([{ role: "admin" }]);
-    const descriptor = update({ verified: true });
-    expect(await authorizeQuery(descriptor, memberId)).toEqual({ ok: true, descriptor });
+    const result = await authorizeQuery(update({ verified: true, display_name: "X" }), memberId);
+    expect(result.ok).toBe(true);
+    expect(result.ok && result.descriptor.values).toEqual({ display_name: "X" });
     expect(query).toHaveBeenCalledWith(expect.stringContaining("public.user_roles"), [memberId]);
   });
 });

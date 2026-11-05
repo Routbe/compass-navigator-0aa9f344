@@ -136,7 +136,12 @@ export async function authorizeQuery(
     return { ok: false, message: `${descriptor.action} on ${descriptor.table} is not allowed` };
   }
 
-  if (await isAdmin(userId)) return { ok: true, descriptor };
+  // Admins may read/delete across owners, but browser writes still pass the
+  // column allowlist; privileged field changes go through typed admin functions.
+  if (await isAdmin(userId)) {
+    if (descriptor.action === "select" || descriptor.action === "delete") return { ok: true, descriptor };
+    return { ok: true, descriptor: stripProtected(descriptor) };
+  }
 
   if (descriptor.action === "select" && access.owner === null) {
     if (!access.publicRead && !userId) return { ok: false, message: "Sign in required" };

@@ -14,7 +14,7 @@ export const enqueueOmniUrl = createServerFn({ method: "POST" })
     try {
       return { ok: true, jobId: await enqueueOmniJob({ userId: context.userId, source: "studio", url: data.target_url, title: data.title, mediaUrl: data.media_url }) };
     } catch (e) {
-      return { ok: false, error: (e as { status?: number }).status === 429 ? "rate_limited" : "failed" };
+      return { ok: false, error: (e as { status?: number }).status === 429 ? "rate_limited" : (e as Error).message === "host_not_allowed" ? "host_not_allowed" : "failed" };
     }
   });
 
